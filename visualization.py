@@ -72,4 +72,3 @@ plt.xlabel("Consumption")
 plt.ylabel("Frequency")
 plt.title("Histogram of Energy consumption")
 plt.show()
-# %%
