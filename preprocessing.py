@@ -39,6 +39,8 @@ def preprocess_consumption_data(df: pd.DataFrame):
     df : pd.DataFrame
         Preprocessed consumption data. Columns:
         # Time-based:
+        - time: datetime, the hour of the measurement. **NB** Not intended to be used as a feature, but left in for
+            convenience.
         - hour: string, the hour of the measurement ("00" - "23", can be used as categorical)
         - month: string, the month of the measurement ("01" - "12", can be used as categorical)
         - season: string, the season of the measurement ("winter", "spring", "summer", "fall", can be used as categorical)
@@ -96,6 +98,9 @@ def preprocess_consumption_data(df: pd.DataFrame):
     df["consumption_1w_ago"] = df.groupby("location")[
         "consumption_normalized"
     ].transform(lambda x: x.shift(7 * 24))
+
+    # Remove original consumption column
+    df = df.drop(columns=["consumption"])
 
     # Extract the temperature features
     df["temperature_1h_ago"] = df.groupby("location")["temperature"].transform(
