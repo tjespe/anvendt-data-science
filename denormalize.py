@@ -29,4 +29,5 @@ def denormalize_predictions(
     ].values
     df["prediction"] = df["prediction"] * df["location_sd"] + df["location_mean"]
     df["actual"] = df["actual"] * df["location_sd"] + df["location_mean"]
-    return df[["prediction", "actual"]]
+    df.drop(["location_sd", "location_mean"], axis=1, inplace=True)
+    return df

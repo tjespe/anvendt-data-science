@@ -2,6 +2,7 @@
 import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
+from denormalize import denormalize_predictions
 
 from preprocessing import preprocess_consumption_data, read_consumption_data
 from train_test_split import split_into_training_validation_and_test
@@ -36,49 +37,71 @@ y_validation_pred = predict_xgb(model, X_validation)
 # Line graph of prediction vs. validattion for each week
 
 # Create a DataFrame to hold the week number, actual values, and predicted values
-results = pd.DataFrame(
+normalized_results = pd.DataFrame(
     {
-        "Week": X_validation.index.get_level_values("time").strftime("%U"),
-        "Actual": y_validation,
-        "Predicted": y_validation_pred,
+        "date": X_validation.index.get_level_values("time").strftime("%A %-d. %b %Y"),
+        "actual": y_validation,
+        "prediction": y_validation_pred,
     },
     index=X_validation.index,
 )
+results = denormalize_predictions(
+    normalized_results,
+    raw_df.groupby("location")["consumption"].std(),
+    raw_df.groupby("location")["consumption"].mean(),
+)
 
 locations = results.index.get_level_values("location").unique()
+dates = results["date"].unique()
 
+# %%
 # Loop through each week and create a separate line graph
-for week_num in results["Week"].unique():
+for date_string in dates:
     for location in locations:
         # Filter data for the current week
         subset = results[
-            (results["Week"] == week_num)
+            (results["date"] == date_string)
             & (results.index.get_level_values("location") == location)
         ]
+
+        # Skip if subset is empty
+        if subset.empty:
+            continue
 
         # Create a new figure and plot the data
         plt.figure(figsize=(12, 6))
         plt.plot(
             subset.index.get_level_values("time"),
-            subset["Actual"],
+            subset["actual"],
             label="Actual",
         )
         plt.plot(
             subset.index.get_level_values("time"),
-            subset["Predicted"],
+            subset["prediction"],
             label="Predicted",
         )
 
+        # Use HH:MM format for the x-axis
+        plt.gca().xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%H:%M"))
+
         # Customize the plot
-        plt.title(f"Week {week_num} - Actual vs. Predicted Consumption")
-        plt.xlabel("Week")
-        plt.ylabel("Consumption")
+        plt.title(
+            f"{date_string} - Actual vs. Predicted Consumption in {location[0].upper()+location[1:]}"
+        )
+        plt.xlabel("Hour of Day")
+        plt.ylabel("Consumption (avg. MW in hour)")
         plt.legend()
+
+        # Start y-axis at 0
+        plt.ylim(bottom=0)
+
+        # Set top of y-axis to 1.5 times the maximum value
+        plt.ylim(top=1.5 * max(subset["actual"].max(), subset["prediction"].max()))
 
         # Display the plot or save it as an image
         plt.grid(True)
         plt.xticks(rotation=45)
         plt.tight_layout()
-plt.show()
+        plt.show()
 
 # %%
