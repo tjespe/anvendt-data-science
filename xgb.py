@@ -106,4 +106,13 @@ if __name__ == "__main__":
     )
     print(f"RMSE: {rmse}")
 
+    # Calculate mean absolute percentage error for denormalized data
+    mape = np.mean(
+        np.abs(
+            (denormalized_results_df["actual"] - denormalized_results_df["prediction"])
+            / denormalized_results_df["actual"]
+        )
+    )
+    print(f"MAPE: {mape}")
+
 # %%
