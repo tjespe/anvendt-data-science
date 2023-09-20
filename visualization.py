@@ -10,13 +10,28 @@ import matplotlib.pyplot as plt
 
 df = read_consumption_data()
 
+# %%
 # Graph of Temperature development
-plt.xlabel('Time')
-plt.ylabel('Temprature')
-plt.title('Temperature for each day')
-plt.plot(df["time"], df["temperature"], 'r')
 
+daily_avg_temp = df.groupby([df["time"].dt.date, "location"])[
+    "temperature"].mean().unstack()
+# Loop through each city and plot its daily average temperature
+for city in daily_avg_temp.columns:
+    plt.plot(daily_avg_temp.index, daily_avg_temp[city], label=city)
 
+# Customize the plot
+plt.title("Daily Average Temperature")
+plt.xlabel("Date")
+plt.ylabel("Average Temperature")
+plt.legend()
+plt.grid(True)
+
+# Display the plot
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+
+# %%
 # Graph of Energy Consumption development
 plt.xlabel('Time')
 plt.ylabel('Consumption')
