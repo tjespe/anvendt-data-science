@@ -11,10 +11,11 @@ import matplotlib.pyplot as plt
 df = read_consumption_data()
 
 # %%
-# Graph of Temperature development
+# Graph of daily average temperature
 
 daily_avg_temp = (
-    df.groupby([df["time"].dt.date, "location"])["temperature"].mean().unstack()
+    df.groupby([df["time"].dt.date, "location"])[
+        "temperature"].mean().unstack()
 )
 # Loop through each city and plot its daily average temperature
 for city in daily_avg_temp.columns:
@@ -40,12 +41,35 @@ plt.ylabel("Frequency")
 plt.title("Histogram of Temperature")
 plt.show()
 
+
 # %%
-# Graph of Energy Consumption development
-plt.xlabel("Time")
-plt.ylabel("Consumption")
-plt.title("Energy Consumption per day")
-plt.plot(df["time"], df["consumption"], "r")
+# Graph of energy consumption development
+daily_avg_energy_consumption = (
+    df.groupby([df["time"].dt.date, "consumption"])[
+        "consumption"].mean().unstack()
+)
+# Loop through each city and plot its daily average energy consumption
+for city in daily_avg_energy_consumption.columns:
+    plt.plot(daily_avg_energy_consumption.index,
+             daily_avg_energy_consumption[city], label=city)
 
+# Customize the plot
+plt.title("Daily Average Energy Consumption")
+plt.xlabel("Date")
+plt.ylabel("Average Energy Consumption")
+plt.legend()
+plt.grid(True)
 
+# Display the plot
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+
+# %%
+# Histogram of all energy consumption values in dataset
+plt.hist(df["consumption"], bins=100)
+plt.xlabel("Consumption")
+plt.ylabel("Frequency")
+plt.title("Histogram of Energy consumption")
+plt.show()
 # %%
