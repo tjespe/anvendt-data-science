@@ -2,6 +2,7 @@
 import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
+import xgboost
 from denormalize import denormalize_predictions
 
 from preprocessing import preprocess_consumption_data, read_consumption_data
@@ -105,3 +106,5 @@ for date_string in dates:
         plt.show()
 
 # %%
+# Plot feature importance
+xgboost.plot_importance(model)
