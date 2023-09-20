@@ -1,5 +1,7 @@
+# %%
 import pandas as pd
 import numpy as np
+from denormalize import denormalize_predictions
 from preprocessing import preprocess_consumption_data, read_consumption_data
 from train_test_split import split_into_training_validation_and_test
 import xgboost as xgb
@@ -54,9 +56,15 @@ def predict_xgb(model: xgb.XGBRegressor, X_test: pd.DataFrame):
 
 
 if __name__ == "__main__":
+    """
+    This code is run when executing the file directly.
+    """
+    # %%
     raw_df = read_consumption_data()
+    # %%
     print("Preprocessing data...")
     processed_df = preprocess_consumption_data(raw_df)
+    # %%
     print("Splitting")
     (
         X_train,
@@ -73,13 +81,29 @@ if __name__ == "__main__":
     model = train_xgb(X_train, y_train)
     y_validation_pred = predict_xgb(model, X_validation)
     rmse = np.sqrt(mean_squared_error(y_validation, y_validation_pred))
-    print(f"RMSE: {rmse}")
+    print(f"RMSE (normalized): {rmse}")
 
+    # %%
     results_df = pd.DataFrame(
         {
-            "truth": y_validation,
+            "actual": y_validation,
             "prediction": y_validation_pred,
         },
         index=y_validation.index,
     )
-    sd_per_location = processed_df
+    sd_per_location = raw_df.groupby("location")["consumption"].std()
+    mean_per_location = raw_df.groupby("location")["consumption"].mean()
+    denormalized_results_df = denormalize_predictions(
+        results_df, sd_per_location, mean_per_location
+    )
+
+    # %%
+    # Calculate RMSE for denormalized data
+    rmse = np.sqrt(
+        mean_squared_error(
+            denormalized_results_df["actual"], denormalized_results_df["prediction"]
+        )
+    )
+    print(f"RMSE: {rmse}")
+
+# %%

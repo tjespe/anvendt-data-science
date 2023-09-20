@@ -2,7 +2,9 @@ import pandas as pd
 
 
 def denormalize_predictions(
-    predictions: pd.DataFrame, sd_per_location: dict, mean_per_location: dict
+    predictions: pd.DataFrame,
+    sd_per_location: pd.Series,
+    mean_per_location: pd.Series,
 ):
     """
     Since we train on and predict consumption normalized per location, we need to
@@ -10,9 +12,21 @@ def denormalize_predictions(
 
     Parameters
     ----------
-    predictions : pd.DataFrame
-        Predictions. Columns:
+    predictions : pd.DataFrame, a dataframe with the predictions and the actual values.
+        Index:
         - time: datetime, the hour of the measurement
         - location: string, one of the 6 cities
-        - prediction: float, the consumption normalized by the mean consumption of the location.
+        Columns:
+        - prediction: float, the predicted consumption normalized by the mean consumption of the location.
+        - actual: float, the actual consumption normalized by the mean consumption of the location.
+    sd_per_location : pd.Series, a dataframe with the standard deviation of the consumption per location.
+    mean_per_location : pd.Series, a dataframe with the mean of the consumption per location.
     """
+    df = predictions.copy()
+    df["location_sd"] = sd_per_location[df.index.get_level_values("location")].values
+    df["location_mean"] = mean_per_location[
+        df.index.get_level_values("location")
+    ].values
+    df["prediction"] = df["prediction"] * df["location_sd"] + df["location_mean"]
+    df["actual"] = df["actual"] * df["location_sd"] + df["location_mean"]
+    return df[["prediction", "actual"]]
