@@ -74,3 +74,12 @@ if __name__ == "__main__":
     y_validation_pred = predict_xgb(model, X_validation)
     rmse = np.sqrt(mean_squared_error(y_validation, y_validation_pred))
     print(f"RMSE: {rmse}")
+
+    results_df = pd.DataFrame(
+        {
+            "truth": y_validation,
+            "prediction": y_validation_pred,
+        },
+        index=y_validation.index,
+    )
+    sd_per_location = processed_df

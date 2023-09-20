@@ -10,18 +10,27 @@ def split_into_training_validation_and_test(df: pd.DataFrame):
     ----------
     df: pd.DataFrame
         The preprocessed data. Required columns:
-        - time: datetime, the hour of the measurement. Will be used for splitting and then removed from the data.
+        - time: datetime, the hour of the measurement. Will be used for splitting and
+                then as index in the resulting dataframes.
+        - location: string, one of the 6 cities. Will be used for splitting and then
+                as index in the resulting dataframes.
+
+    Returns
+    -------
+    X_train, y_train, X_validation, y_validation, X_test, y_test: pd.DataFrame
+        The training, validation and test sets. y_* is the target variable, X_* are the features.
+        All the dataframes have (time, location) as index.
     """
+    # Use time and location as index
+    df = df.set_index(["time", "location"])
+    # Use location as a categorical column as well
+    df["location"] = df.index.get_level_values("location")
     # Split into training and test
-    df_train = df[df["time"].dt.day % 2 == 0]
-    df_test = df[df["time"].dt.day % 2 == 1]
+    df_train = df[df.index.get_level_values("time").day % 2 == 0]
+    df_test = df[df.index.get_level_values("time").day % 2 == 1]
     # Split the test into validation and test
-    df_validation = df_test[df_test["time"].dt.day % 4 == 1]
-    df_test = df_test[df_test["time"].dt.day % 4 == 3]
-    # Remove the time column
-    df_train = df_train.drop(columns=["time"])
-    df_validation = df_validation.drop(columns=["time"])
-    df_test = df_test.drop(columns=["time"])
+    df_validation = df_test[df_test.index.get_level_values("time").day % 4 == 1]
+    df_test = df_test[df_test.index.get_level_values("time").day % 4 != 1]
     # Split each dataframe into X and y
     X_train, y_train = (
         df_train.drop(columns=["consumption_normalized"]),
