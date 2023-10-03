@@ -25,12 +25,14 @@ def split_into_training_validation_and_test(df: pd.DataFrame):
     df = df.set_index(["time", "location"])
     # Use location as a categorical column as well
     df["location"] = df.index.get_level_values("location")
-    # Split into training and test
-    df_train = df[df.index.get_level_values("time").day % 2 == 0]
-    df_test = df[df.index.get_level_values("time").day % 2 == 1]
-    # Split the test into validation and test
-    df_validation = df_test[df_test.index.get_level_values("time").day % 4 == 1]
-    df_test = df_test[df_test.index.get_level_values("time").day % 4 != 1]
+    # Split into training, test and validation
+    df_train = df[df["type"] == "training"]
+    df_validation = df[df["type"] == "validation"]
+    df_test = df[df["type"] == "test"]
+    # Drop type columns
+    df_train = df_train.drop(columns=["type"])
+    df_validation = df_validation.drop(columns=["type"])
+    df_test = df_test.drop(columns=["type"])
     # Split each dataframe into X and y
     X_train, y_train = (
         df_train.drop(columns=["consumption_normalized"]),

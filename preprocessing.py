@@ -38,7 +38,7 @@ def preprocess_consumption_data(df: pd.DataFrame):
     -------
     df : pd.DataFrame
         Preprocessed consumption data. Columns:
-        # Time-based:
+        ### Time-based:
         - time: datetime, the hour of the measurement. **NB** Not intended to be used as a feature, but left in for
             convenience.
         - hour: string, the hour of the measurement ("00" - "23", can be used as categorical)
@@ -48,17 +48,20 @@ def preprocess_consumption_data(df: pd.DataFrame):
         - weekday: string, the weekday of the measurement ("Monday" - "Sunday", can be used as categorical)
         - vacation: bool, whether the measurement was during a vacation NOT IMPLEMENTED
         - days_to_vacation: int, number of days to the next vacation NOT IMPLEMENTED
-        # Location-based:
+        ### Location-based:
         - location: string, one of the 6 cities
-        # Consumption-based:
+        ### Consumption-based:
         - consumption_normalized: float, the consumption normalized by the mean consumption of the location.
             **NB**: This is the target variable.
         - mean_consumption_7d: float, the mean (normalized) consumption at that hour last 7 days
             **NB**: Since there is a 5 day data lag, this feature is the mean of the 7 days preceding the
             5 days preceding the measurement, i.e. |---7d used for mean---|---5d gap---|---measurement---|
+            For training, we only use training data points when calculating the mean.
+            For validation, we only use training and validation data points when calculating the mean.
+            For test, we only use training, validation, and test data points when calculating the mean.
         - mean_consumption_14d: float, the mean (normalized) consumption at that hour last 14 days (same system as 7d)
         - consumption_1w_ago: float, the consumption (normalized) at the same hour 1 week ago.
-        # Temperature-based:
+        ### Temperature-based:
         - temperature: float, avg. forecasted temperature in the hour
         - temperature_1h_ago: float, avg. forecasted temperature in the hour 1 hour ago
         - temperature_2h_ago: float, avg. forecasted temperature in the hour 2 hours ago
@@ -67,6 +70,14 @@ def preprocess_consumption_data(df: pd.DataFrame):
         - temperature_7_to_12h_ago: float, avg. forecasted temperature in the hours 7-12 hours ago
         - temperature_13_to_24h_ago: float, avg. forecasted temperature in the hours 13-24 hours ago
     """
+    # Define the type of each row (training, test, validation)
+    # Most days are training
+    df["type"] = "training"
+    # Every 10th day is validation
+    df.loc[df["time"].dt.day % 10 == 0, "type"] = "validation"
+    # Every 19th day is test
+    df.loc[df["time"].dt.day % 19 == 0, "type"] = "test"
+
     # Extract the hour, month, season, weekday, and weekend
     df["hour"] = df["time"].dt.strftime("%H")
     df["month"] = df["time"].dt.strftime("%m")
@@ -89,12 +100,30 @@ def preprocess_consumption_data(df: pd.DataFrame):
     df["consumption_normalized"] = df.groupby("location")["consumption"].transform(
         lambda x: (x - x.mean()) / x.std()
     )
-    df["mean_consumption_7d"] = df.groupby("hour")["consumption_normalized"].transform(
-        lambda x: x.shift(5).rolling(7).mean()
-    )
-    df["mean_consumption_14d"] = df.groupby("hour")["consumption_normalized"].transform(
-        lambda x: x.shift(5).rolling(14).mean()
-    )
+    for lookback in [4, 7, 14]:
+        df.loc[df["type"] == "training", f"mean_consumption_{lookback}d"] = (
+            df.loc[df["type"] == "training"].groupby(["hour", "location"])[
+                "consumption_normalized"
+            ]
+            # **NB**: This is a bit simplified. There might be a test of validation day
+            # in the 7 days preceding the measurement, and since we have excluded those
+            # from the mean, the mean is not exactly the mean of the 7 days preceding
+            # the measurement. It might be the previous 8 or 9 days (but only a mean of
+            # 7 of the days is used).
+            .transform(lambda x: x.shift(5 * 24).rolling(lookback * 24).mean())
+        )
+        df.loc[df["type"] == "validation", f"mean_consumption_{lookback}d"] = (
+            df.loc[(df["type"] == "validation") | (df["type"] == "training")]
+            .groupby(["hour", "location"])["consumption_normalized"]
+            .transform(lambda x: x.shift(5 * 24).rolling(lookback * 24).mean())
+        )
+        df.loc[df["type"] == "test", f"mean_consumption_{lookback}d"] = df.groupby(
+            ["hour", "location"]
+        )["consumption_normalized"].transform(
+            lambda x: x.shift(5 * 24).rolling(lookback * 24).mean()
+        )
+
+    # TODO: Consider whether this data leak is a problem
     df["consumption_1w_ago"] = df.groupby("location")[
         "consumption_normalized"
     ].transform(lambda x: x.shift(7 * 24))
@@ -103,6 +132,10 @@ def preprocess_consumption_data(df: pd.DataFrame):
     df = df.drop(columns=["consumption"])
 
     # Extract the temperature features
+    # TODO: There is perhaps some potential for data leakage here, since the
+    # temperature is averaged across hours that might be in the previous day,
+    # and the previous day might be a test or validation day. However, since
+    # the temperature is not a target variable, this should not be a problem.
     df["temperature_1h_ago"] = df.groupby("location")["temperature"].transform(
         lambda x: x.shift(1)
     )
