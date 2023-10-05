@@ -75,21 +75,21 @@ def preprocess_consumption_data(df: pd.DataFrame):
     df["type"] = "training"
     # Every 10th day is validation
     df.loc[df["time"].dt.day % 10 == 0, "type"] = "validation"
-    # Every 19th day is test
-    df.loc[df["time"].dt.day % 19 == 0, "type"] = "test"
+    # Every 10th day is test, but with an offset of 5 days
+    df.loc[df["time"].dt.day % 10 == 5, "type"] = "test"
 
     # Extract the hour, month, season, weekday, and weekend
     df["hour"] = df["time"].dt.strftime("%H")
-    df["month"] = df["time"].dt.strftime("%m")
-    df["season"] = df["time"].dt.month.apply(
-        lambda x: "winter"
-        if x in [12, 1, 2]
-        else "spring"
-        if x in [3, 4, 5]
-        else "summer"
-        if x in [6, 7, 8]
-        else "fall"
-    )
+    # df["month"] = df["time"].dt.strftime("%m")
+    # df["season"] = df["time"].dt.month.apply(
+    #     lambda x: "winter"
+    #     if x in [12, 1, 2]
+    #     else "spring"
+    #     if x in [3, 4, 5]
+    #     else "summer"
+    #     if x in [6, 7, 8]
+    #     else "fall"
+    # )
     df["weekday"] = df["time"].dt.day_name()
     df["weekend"] = df["weekday"].isin(["Saturday", "Sunday"])
 
@@ -127,6 +127,38 @@ def preprocess_consumption_data(df: pd.DataFrame):
     df["consumption_1w_ago"] = df.groupby("location")[
         "consumption_normalized"
     ].transform(lambda x: x.shift(7 * 24))
+    for weekday in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]:
+        df.loc[
+            (df["type"] == "training") & (df["weekday"] == weekday),
+            f"consumption_1w_ago",
+        ] = (
+            df.loc[(df["type"] == "training") & (df["weekday"] == weekday)].groupby(
+                "location"
+            )["consumption_normalized"]
+            # **NB**: This is a bit simplified. If the measurement is on a Monday,
+            # and the last Monday was a test or validation day, this code will select
+            # the Monday before that.
+            .transform(lambda x: x.shift(24))
+        )
+        df.loc[
+            (df["type"] == "validation") & (df["weekday"] == weekday),
+            f"consumption_1w_ago",
+        ] = (
+            df.loc[
+                ((df["type"] == "training") | (df["type"] == "validation"))
+                & (df["weekday"] == weekday)
+            ]
+            .groupby("location")["consumption_normalized"]
+            .transform(lambda x: x.shift(24))
+        )
+        df.loc[
+            (df["type"] == "test") & (df["weekday"] == weekday),
+            f"consumption_1w_ago",
+        ] = (
+            df.loc[df["weekday"] == weekday]
+            .groupby("location")["consumption_normalized"]
+            .transform(lambda x: x.shift(24))
+        )
 
     # Remove original consumption column
     df = df.drop(columns=["consumption"])
