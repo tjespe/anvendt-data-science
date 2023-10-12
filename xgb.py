@@ -81,11 +81,14 @@ if __name__ == "__main__":
     raw_df = raw_df[raw_df["location"] != "helsingfors"]
     # %%
     print("Preprocessing data...")
-    processed_df = preprocess_consumption_data(raw_df)
+    rolling_normalization_window_days = 30
+    processed_df = preprocess_consumption_data(
+        raw_df, rolling_normalization_window_days
+    )
     # %%
     print("Splitting")
     folds = split_into_cv_folds_and_test_fold(processed_df)
-    cv_folds = folds[1:-1]
+    cv_folds = folds[:-1]
     results_dfs = []
     for i, (training, validation) in enumerate(cv_folds):
         print(f"CV fold {i}")
@@ -105,7 +108,10 @@ if __name__ == "__main__":
             },
             index=y_val.index,
         )
-        denormalized_results_df = denormalize_predictions(results_df, raw_df)
+        denormalized_results_df = denormalize_predictions(
+            results_df, raw_df, rolling_normalization_window_days
+        )
+        denormalized_results_df["fold"] = i
         results_dfs.append(denormalized_results_df)
 
     # %%
@@ -118,12 +124,26 @@ if __name__ == "__main__":
     print(f"RMSE: {rmse}")
 
     # Calculate mean absolute percentage error for denormalized data
-    mape = np.mean(
-        100
-        * np.abs(
-            (results_df["actual"] - results_df["prediction"]) / results_df["actual"]
-        )
+    results_df["APE"] = 100 * np.abs(
+        (results_df["actual"] - results_df["prediction"]) / results_df["actual"]
     )
-    print(f"MAPE: {mape}%")
+    print(f"MAPE: {results_df['APE'].mean()}%")
+    print(
+        "MAPE per",
+        results_df.groupby(
+            results_df.index.get_level_values("location"), observed=True
+        )["APE"].mean(),
+    )
+    print("MAPE per fold", results_df.groupby("fold")["APE"].mean())
+
+    # %%
+    # Look at performance in Oslo
+    for date in results_df.reset_index()["time"].dt.date.unique():
+        results_df[
+            (results_df["fold"] == 3)
+            & (results_df.index.get_level_values("location") == "oslo")
+            & (pd.Series(results_df.index.get_level_values("time")).dt.date == date)
+        ][["actual", "prediction"]].plot()
+
 
 # %%

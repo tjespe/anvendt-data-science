@@ -21,18 +21,21 @@ def read_consumption_data():
     return df
 
 
-def preprocess_consumption_data(df: pd.DataFrame):
+def preprocess_consumption_data(df: pd.DataFrame, rolling_normalization_window_days=30):
     """
     Preprocesses the consumption data.
 
     Parameters
     ----------
-    df : pd.DataFrame
+    df: pd.DataFrame
         Consumption data. Columns:
         - time: datetime, the hour of the measurement
         - location: string, one of the 6 cities
         - consumption: float, avg. MW in the hour
         - temperature: float, avg. temperature in the hour
+    rolling_normalization_window_days: int or None
+        If set to a number, a rolling window will be used for normalizing consumption
+        within each location (as opposed to using all data up until each data point).
 
     Returns
     -------
@@ -92,12 +95,20 @@ def preprocess_consumption_data(df: pd.DataFrame):
 
     # %%
     # Normalize consumption using cumulative normalization per location
-    cumulative_stats = (
-        (df.groupby("location")["consumption"].expanding().agg(["mean", "std"]))
-        .reset_index()
-        .set_index("level_1")
-        .sort_index()
-    )
+    if rolling_normalization_window_days:
+        cumulative_stats = (
+            df.groupby("location", observed=True)["consumption"]
+            .shift(5 * 24)  # Shift by 5 days to account for lag on receiving data
+            .rolling(rolling_normalization_window_days * 24)
+            .agg(["mean", "std"])
+        )
+    else:
+        cumulative_stats = (
+            df.groupby("location", observed=True)["consumption"]
+            .shift(5 * 24)  # Shift by 5 days to account for lag on receiving data
+            .expanding()
+            .agg(["mean", "std"])
+        )
     cumulative_stats["std"].replace(0, 1, inplace=True)
     df["consumption_normalized"] = (
         df["consumption"] - cumulative_stats["mean"]
@@ -110,33 +121,35 @@ def preprocess_consumption_data(df: pd.DataFrame):
     # %%
     # Generate consumption features
     for lookback in [4, 7, 14]:
-        df[f"mean_consumption_{lookback}d"] = df.groupby(["hour", "location"])[
-            "consumption_normalized"
-        ].transform(lambda x: x.shift(5).rolling(lookback).mean())
+        df[f"mean_consumption_{lookback}d"] = df.groupby(
+            ["hour", "location"], observed=True
+        )["consumption_normalized"].transform(
+            lambda x: x.shift(5).rolling(lookback).mean()
+        )
 
-    df["consumption_1w_ago"] = df.groupby(["location", "weekday", "hour"])[
-        "consumption_normalized"
-    ].transform(lambda x: x.shift(1))
+    df["consumption_1w_ago"] = df.groupby(
+        ["location", "weekday", "hour"], observed=True
+    )["consumption_normalized"].transform(lambda x: x.shift(1))
 
     # Extract the temperature features
-    df["temperature_1h_ago"] = df.groupby("location")["temperature"].transform(
-        lambda x: x.shift(1)
-    )
-    df["temperature_2h_ago"] = df.groupby("location")["temperature"].transform(
-        lambda x: x.shift(2)
-    )
-    df["temperature_3h_ago"] = df.groupby("location")["temperature"].transform(
-        lambda x: x.shift(3)
-    )
-    df["temperature_4_to_6h_ago"] = df.groupby("location")["temperature"].transform(
-        lambda x: x.shift(4).rolling(3).mean()
-    )
-    df["temperature_7_to_12h_ago"] = df.groupby("location")["temperature"].transform(
-        lambda x: x.shift(7).rolling(6).mean()
-    )
-    df["temperature_13_to_24h_ago"] = df.groupby("location")["temperature"].transform(
-        lambda x: x.shift(13).rolling(12).mean()
-    )
+    df["temperature_1h_ago"] = df.groupby("location", observed=True)[
+        "temperature"
+    ].transform(lambda x: x.shift(1))
+    df["temperature_2h_ago"] = df.groupby("location", observed=True)[
+        "temperature"
+    ].transform(lambda x: x.shift(2))
+    df["temperature_3h_ago"] = df.groupby("location", observed=True)[
+        "temperature"
+    ].transform(lambda x: x.shift(3))
+    df["temperature_4_to_6h_ago"] = df.groupby("location", observed=True)[
+        "temperature"
+    ].transform(lambda x: x.shift(4).rolling(3).mean())
+    df["temperature_7_to_12h_ago"] = df.groupby("location", observed=True)[
+        "temperature"
+    ].transform(lambda x: x.shift(7).rolling(6).mean())
+    df["temperature_13_to_24h_ago"] = df.groupby("location", observed=True)[
+        "temperature"
+    ].transform(lambda x: x.shift(13).rolling(12).mean())
 
     # Some rows have NaN because of the lookback features, but since there are so few,
     # we drop them
