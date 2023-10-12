@@ -69,7 +69,9 @@ if __name__ == "__main__":
             rolling_normalization_window_days = trial.suggest_int(
                 "rolling_normalization_window_days", 5, 100
             )
-        num_splits = trial.suggest_int("num_splits", 2, 30)
+        # Based on results, it seemed like num_splits is not an important hyperparam,
+        # so we set it to a fixes number instead
+        num_splits = 10
         n_estimators = trial.suggest_int("n_estimators", 1, 10_000, log=True)
         max_depth = trial.suggest_int("max_depth", 1, 40, log=True)
         learning_rate = trial.suggest_float("learning_rate", 1e-9, 1, log=True)

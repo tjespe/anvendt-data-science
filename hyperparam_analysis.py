@@ -1,6 +1,9 @@
 # %%
 import optuna
 import matplotlib.pyplot as plt
+import pandas as pd
+import scipy.stats as stats
+
 
 if __name__ == "__main__":
     """
@@ -58,8 +61,84 @@ if __name__ == "__main__":
     plt.show()
 
     # %%
+    # Show how RMSE and MAPE changes for the different parameters
+    for hyperparam in [
+        "rolling_normalization_window_days",
+        "num_splits",
+        "n_estimators",
+        "max_depth",
+        "learning_rate",
+    ]:
+        relevant_trials = sorted(
+            [
+                trial
+                for trial in study.trials
+                if trial.values and hyperparam in trial.params
+            ],
+            key=lambda trial: trial.params[hyperparam],
+        )
+        fig, ax1 = plt.subplots()
+        x = pd.Series([trial.params[hyperparam] for trial in relevant_trials])
+        y1 = pd.Series([trial.values[0] for trial in relevant_trials])
+        # ax1.plot(x, y1, label="RMSE")
+        ax1.scatter(x, y1)
+        ax1.set_xscale("log")
+        plt.xlabel(hyperparam)
+        ax1.set_ylabel("RMSE")
+        ax2 = ax1.twinx()
+        y2 = pd.Series([trial.values[1] for trial in relevant_trials])
+        # ax2.plot(x, y2, c="red", label="MAPE")
+        ax2.scatter(x, y2, c="red")
+        ax2.set_ylabel("MAPE")
+        plt.show()
+
+        # Calculating Pearson correlation for hyperparam and RMSE
+        correlation_rmse, p_value_rmse = stats.pearsonr(x, y1)
+        print(
+            f"Pearson correlation coefficient between {hyperparam} and RMSE: {correlation_rmse}"
+        )
+        print(f"P-value: {p_value_rmse}")
+
+        # Calculating Pearson correlation for hyperparam and MAPE
+        correlation_mape, p_value_mape = stats.pearsonr(x, y2)
+        print(
+            f"Pearson correlation coefficient between {hyperparam} and MAPE: {correlation_mape}"
+        )
+        print(f"P-value: {p_value_mape}")
+
+    # %%
     # Check effect of using rolling_normalization_window_days instead of all historical data
-    df = pd.DataFrame([trial.params["use_norma"]])
+    df = pd.DataFrame(
+        [
+            (
+                trial.params["use_rolling_normalization"],
+                trial.values[0],
+                trial.values[1],
+            )
+            for trial in study.trials
+            if trial.values
+        ],
+        columns=["use_rolling_normalization", "RMSE", "MAPE"],
+    )
+    print("Mean RMSE when using rolling window normalization vs. expanding")
+    print(df.groupby("use_rolling_normalization")["RMSE"].agg("mean"))
+    grouped = df.groupby("use_rolling_normalization")["RMSE"]
+    rmse_no_rolling = grouped.get_group(False)
+    rmse_rolling = grouped.get_group(True)
+    t_stat_rmse, p_value_rmse = stats.ttest_ind(
+        rmse_no_rolling, rmse_rolling, equal_var=False, alternative="less"
+    )
+    print("p-value:", p_value_rmse)
+
+    print("\nMean MAPE when using rolling window normalization vs. expanding")
+    print(df.groupby("use_rolling_normalization")["MAPE"].agg("mean"))
+    grouped = df.groupby("use_rolling_normalization")["MAPE"]
+    mape_no_rolling = grouped.get_group(False)
+    mape_rolling = grouped.get_group(True)
+    t_stat_mape, p_value_mape = stats.ttest_ind(
+        mape_no_rolling, mape_rolling, equal_var=False, alternative="less"
+    )
+    print("p-value:", p_value_mape)
 
     # %%
     # Show hyperparameter importance for RMSE
