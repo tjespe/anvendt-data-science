@@ -68,6 +68,10 @@ if __name__ == "__main__":
         "n_estimators",
         "max_depth",
         "learning_rate",
+        "subsample",
+        "colsample_bytree",
+        "gamma",
+        "reg_lambda",
     ]:
         relevant_trials = sorted(
             [
@@ -111,34 +115,44 @@ if __name__ == "__main__":
     df = pd.DataFrame(
         [
             (
-                trial.params["use_rolling_normalization"],
+                trial.params.get("use_target_normalization", True),
+                trial.params.get("use_rolling_normalization", None),
                 trial.values[0],
                 trial.values[1],
             )
             for trial in study.trials
             if trial.values
         ],
-        columns=["use_rolling_normalization", "RMSE", "MAPE"],
+        columns=["use_normalization", "use_rolling_normalization", "RMSE", "MAPE"],
     )
-    print("Mean RMSE when using rolling window normalization vs. expanding")
-    print(df.groupby("use_rolling_normalization")["RMSE"].agg("mean"))
-    grouped = df.groupby("use_rolling_normalization")["RMSE"]
-    rmse_no_rolling = grouped.get_group(False)
-    rmse_rolling = grouped.get_group(True)
-    t_stat_rmse, p_value_rmse = stats.ttest_ind(
-        rmse_no_rolling, rmse_rolling, equal_var=False, alternative="less"
-    )
-    print("p-value:", p_value_rmse)
+    for metric in ["RMSE", "MAPE"]:
+        print(f"Mean {metric} when using rolling window normalization vs. expanding")
+        print(
+            df[df["use_normalization"] == True]
+            .groupby("use_rolling_normalization")[metric]
+            .agg("mean")
+        )
+        grouped = df[df["use_normalization"] == True].groupby(
+            "use_rolling_normalization"
+        )[metric]
+        rmse_no_rolling = grouped.get_group(False)
+        rmse_rolling = grouped.get_group(True)
+        t_stat_rmse, p_value_rmse = stats.ttest_ind(
+            rmse_no_rolling, rmse_rolling, equal_var=False, alternative="less"
+        )
+        print("p-value:", p_value_rmse)
 
-    print("\nMean MAPE when using rolling window normalization vs. expanding")
-    print(df.groupby("use_rolling_normalization")["MAPE"].agg("mean"))
-    grouped = df.groupby("use_rolling_normalization")["MAPE"]
-    mape_no_rolling = grouped.get_group(False)
-    mape_rolling = grouped.get_group(True)
-    t_stat_mape, p_value_mape = stats.ttest_ind(
-        mape_no_rolling, mape_rolling, equal_var=False, alternative="less"
-    )
-    print("p-value:", p_value_mape)
+    print()
+    for metric in ["RMSE", "MAPE"]:
+        print(f"Mean {metric} when using normalization vs. no normalization")
+        print(df.groupby("use_normalization")[metric].agg("mean"))
+        grouped = df.groupby("use_normalization")[metric]
+        rmse_no_rolling = grouped.get_group(False)
+        rmse_rolling = grouped.get_group(True)
+        t_stat_rmse, p_value_rmse = stats.ttest_ind(
+            rmse_no_rolling, rmse_rolling, equal_var=False, alternative="less"
+        )
+        print("p-value:", p_value_rmse)
 
     # %%
     # Show hyperparameter importance for RMSE

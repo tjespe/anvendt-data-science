@@ -131,21 +131,30 @@ def preprocess_consumption_data(df: pd.DataFrame, rolling_normalization_window_d
     ) / cumulative_stats["std"]
 
     # %%
-    # Remove original consumption column
-    df = df.drop(columns=["consumption"])
-
-    # %%
     # Generate consumption features
     for lookback in [4, 7, 14]:
-        df[f"mean_consumption_{lookback}d"] = df.groupby(
+        df[f"mean_consumption_at_hour_{lookback}d"] = df.groupby(
             ["hour", "location"], observed=True
-        )["consumption_normalized"].transform(
-            lambda x: x.shift(5).rolling(lookback).mean()
-        )
+        )["consumption"].transform(lambda x: x.shift(5).rolling(lookback).mean())
+        df[f"mean_consumption_at_hour_{lookback}d_normalized"] = (
+            df[f"mean_consumption_at_hour_{lookback}d"] - cumulative_stats["mean"]
+        ) / cumulative_stats["std"]
+        df[f"mean_consumption_{lookback}d"] = df.groupby("location", observed=True)[
+            "consumption"
+        ].transform(lambda x: x.shift(5 * 24).rolling(lookback).mean())
+        df[f"mean_consumption_{lookback}d_normalized"] = (
+            df[f"mean_consumption_{lookback}d"] - cumulative_stats["mean"]
+        ) / cumulative_stats["std"]
 
     df["consumption_1w_ago"] = df.groupby(
         ["location", "weekday", "hour"], observed=True
-    )["consumption_normalized"].transform(lambda x: x.shift(1))
+    )["consumption"].transform(lambda x: x.shift(1))
+    df["consumption_1w_ago_normalized"] = (
+        df.groupby(["location", "weekday", "hour"], observed=True)[
+            "consumption"
+        ].transform(lambda x: x.shift(1))
+        - cumulative_stats["mean"]
+    ) / cumulative_stats["std"]
 
     # Extract the temperature features
     df["temperature_1h_ago"] = df.groupby("location", observed=True)[
