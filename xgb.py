@@ -9,6 +9,12 @@ from train_test_split import (
 import xgboost as xgb
 from sklearn.metrics import mean_squared_error
 import optuna
+import json
+
+import warnings
+
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 
 def train_xgb(
@@ -64,9 +70,10 @@ if __name__ == "__main__":
                 "rolling_normalization_window_days", 5, 100
             )
         num_splits = trial.suggest_int("num_splits", 2, 30)
-        n_estimators = trial.suggest_int("n_estimators", 1, 1e6, log=True)
-        max_depth = trial.suggest_int("max_depth", 1, 100, log=True)
+        n_estimators = trial.suggest_int("n_estimators", 1, 10_000, log=True)
+        max_depth = trial.suggest_int("max_depth", 1, 40, log=True)
         learning_rate = trial.suggest_float("learning_rate", 1e-9, 1, log=True)
+        print(json.dumps(trial.params, indent=4))
 
         # %%
         print("Preprocessing data...")
@@ -127,6 +134,7 @@ if __name__ == "__main__":
             (results_df["actual"] - results_df["prediction"]) / results_df["actual"]
         )
         results_df["APE"] = np.abs(results_df["PE"])
+        mape = results_df["APE"].mean()
         print(f"MAPE: {results_df['APE'].mean()}%")
         print(
             "MAPE per",
@@ -155,14 +163,16 @@ if __name__ == "__main__":
         #     ].plot()
 
         # %%
-        return rmse
+        return rmse, mape
 
     study_name = "XGBoost consumption prediction"
     try:
         study = optuna.load_study(study_name=study_name, storage="sqlite:///optuna.db")
     except KeyError as e:
         study = optuna.create_study(
-            direction="minimize", storage="sqlite:///optuna.db", study_name=study_name
+            directions=["minimize", "minimize"],
+            storage="sqlite:///optuna.db",
+            study_name=study_name,
         )
 
     study.optimize(objective, n_trials=100)
