@@ -77,12 +77,15 @@ if __name__ == "__main__":
     # %%
     raw_df = read_consumption_data()
     # %%
+    # Drop helsingfors
+    raw_df = raw_df[raw_df["location"] != "helsingfors"]
+    # %%
     print("Preprocessing data...")
     processed_df = preprocess_consumption_data(raw_df)
     # %%
     print("Splitting")
     folds = split_into_cv_folds_and_test_fold(processed_df)
-    cv_folds = folds[:-1]
+    cv_folds = folds[1:-1]
     results_dfs = []
     for i, (training, validation) in enumerate(cv_folds):
         print(f"CV fold {i}")
@@ -95,7 +98,6 @@ if __name__ == "__main__":
         rmse = np.sqrt(mean_squared_error(y_val, y_val_pred))
         print(f"RMSE (normalized): {rmse}")
 
-        # %%
         results_df = pd.DataFrame(
             {
                 "actual": y_val,
@@ -103,16 +105,12 @@ if __name__ == "__main__":
             },
             index=y_val.index,
         )
-        sd_per_location = raw_df.groupby("location")["consumption"].std()
-        mean_per_location = raw_df.groupby("location")["consumption"].mean()
-        denormalized_results_df = denormalize_predictions(
-            results_df, sd_per_location, mean_per_location
-        )
+        denormalized_results_df = denormalize_predictions(results_df, raw_df)
         results_dfs.append(denormalized_results_df)
 
     # %%
     # Merge result dataframes
-    results_df = pd.merge(results_dfs)
+    results_df = pd.concat(results_dfs)
 
     # %%
     # Calculate RMSE for denormalized data
@@ -121,8 +119,11 @@ if __name__ == "__main__":
 
     # Calculate mean absolute percentage error for denormalized data
     mape = np.mean(
-        np.abs((results_df["actual"] - results_df["prediction"]) / results_df["actual"])
+        100
+        * np.abs(
+            (results_df["actual"] - results_df["prediction"]) / results_df["actual"]
+        )
     )
-    print(f"MAPE: {mape}")
+    print(f"MAPE: {mape}%")
 
 # %%

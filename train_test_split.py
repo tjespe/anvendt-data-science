@@ -47,12 +47,12 @@ def split_into_cv_folds_and_test_fold(df: pd.DataFrame, n_splits=5):
         folds.append(
             (
                 (
-                    df.loc[training_indices].drop(columns=["consumption_normalized"]),
-                    df.loc[training_indices, "consumption_normalized"],
+                    df.iloc[training_indices].drop(columns=["consumption_normalized"]),
+                    df.iloc[training_indices]["consumption_normalized"],
                 ),
                 (
-                    df.loc[test_indices].drop(columns=["consumption_normalized"]),
-                    df.loc[test_indices, "consumption_normalized"],
+                    df.iloc[test_indices].drop(columns=["consumption_normalized"]),
+                    df.iloc[test_indices]["consumption_normalized"],
                 ),
             )
         )

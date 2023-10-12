@@ -70,6 +70,7 @@ def preprocess_consumption_data(df: pd.DataFrame):
         - temperature_7_to_12h_ago: float, avg. forecasted temperature in the hours 7-12 hours ago
         - temperature_13_to_24h_ago: float, avg. forecasted temperature in the hours 13-24 hours ago
     """
+    # %%
     # Extract the hour, month, season, weekday, and weekend
     df["hour"] = df["time"].dt.strftime("%H")
     # df["month"] = df["time"].dt.strftime("%m")
@@ -85,13 +86,29 @@ def preprocess_consumption_data(df: pd.DataFrame):
     df["weekday"] = df["time"].dt.day_name()
     df["weekend"] = df["weekday"].isin(["Saturday", "Sunday"])
 
+    # %%
     # Extract the location
     df["location"] = df["location"].astype("category")
 
-    # Extract the consumption features
-    df["consumption_normalized"] = df.groupby("location")["consumption"].transform(
-        lambda x: (x - x.mean()) / x.std()
+    # %%
+    # Normalize consumption using cumulative normalization per location
+    cumulative_stats = (
+        (df.groupby("location")["consumption"].expanding().agg(["mean", "std"]))
+        .reset_index()
+        .set_index("level_1")
+        .sort_index()
     )
+    cumulative_stats["std"].replace(0, 1, inplace=True)
+    df["consumption_normalized"] = (
+        df["consumption"] - cumulative_stats["mean"]
+    ) / cumulative_stats["std"]
+
+    # %%
+    # Remove original consumption column
+    df = df.drop(columns=["consumption"])
+
+    # %%
+    # Generate consumption features
     for lookback in [4, 7, 14]:
         df[f"mean_consumption_{lookback}d"] = df.groupby(["hour", "location"])[
             "consumption_normalized"
@@ -100,9 +117,6 @@ def preprocess_consumption_data(df: pd.DataFrame):
     df["consumption_1w_ago"] = df.groupby(["location", "weekday", "hour"])[
         "consumption_normalized"
     ].transform(lambda x: x.shift(1))
-
-    # Remove original consumption column
-    df = df.drop(columns=["consumption"])
 
     # Extract the temperature features
     df["temperature_1h_ago"] = df.groupby("location")["temperature"].transform(
@@ -132,4 +146,5 @@ def preprocess_consumption_data(df: pd.DataFrame):
     )
     df.drop(df[drop_mask].index, inplace=True)
 
+    # %%
     return df
