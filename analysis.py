@@ -112,18 +112,21 @@ print(
 )
 
 # %%
+results_df = results_df.reset_index()
+results_df["date"] = results_df["time"].dt.date
+dates = results_df["date"].unique()
+locations = results_df["location"].unique()
+results_df = results_df.set_index(["time", "location"])
+
+# %%
 # Look at performance in Oslo
-for date in results_df.reset_index()["time"].dt.date.unique():
+for date in dates:
     values_on_date = results_df.reset_index().loc[
         pd.Series(results_df.index.get_level_values("time")).dt.date == date
     ]
     values_on_date[values_on_date["location"] == "oslo"].set_index("time")[
         ["actual", "prediction"]
     ].plot()
-
-
-locations = results_df.index.get_level_values("location").unique()
-dates = results_df["date"].unique()
 
 # %%
 # Loop through each week and create a separate line graph
