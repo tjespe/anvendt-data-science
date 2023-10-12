@@ -93,7 +93,7 @@ def preprocess_consumption_data(df: pd.DataFrame):
         lambda x: (x - x.mean()) / x.std()
     )
     for lookback in [4, 7, 14]:
-        df.loc[f"mean_consumption_{lookback}d"] = df.groupby(["hour", "location"])[
+        df[f"mean_consumption_{lookback}d"] = df.groupby(["hour", "location"])[
             "consumption_normalized"
         ].transform(lambda x: x.shift(5 * 24).rolling(lookback * 24).mean())
 
