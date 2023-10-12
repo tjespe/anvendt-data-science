@@ -95,17 +95,11 @@ def preprocess_consumption_data(df: pd.DataFrame):
     for lookback in [4, 7, 14]:
         df[f"mean_consumption_{lookback}d"] = df.groupby(["hour", "location"])[
             "consumption_normalized"
-        ].transform(lambda x: x.shift(5 * 24).rolling(lookback * 24).mean())
+        ].transform(lambda x: x.shift(5).rolling(lookback).mean())
 
-    for weekday in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]:
-        df.loc[
-            (df["weekday"] == weekday),
-            f"consumption_1w_ago",
-        ] = (
-            df.loc[(df["weekday"] == weekday)]
-            .groupby("location")["consumption_normalized"]
-            .transform(lambda x: x.shift(24))
-        )
+    df["consumption_1w_ago"] = df.groupby(["location", "weekday", "hour"])[
+        "consumption_normalized"
+    ].transform(lambda x: x.shift(1))
 
     # Remove original consumption column
     df = df.drop(columns=["consumption"])
@@ -129,5 +123,13 @@ def preprocess_consumption_data(df: pd.DataFrame):
     df["temperature_13_to_24h_ago"] = df.groupby("location")["temperature"].transform(
         lambda x: x.shift(13).rolling(12).mean()
     )
+
+    # Some rows have NaN because of the lookback features, but since there are so few,
+    # we drop them
+    drop_mask = df.isna().sum(axis=1) > 0
+    print(
+        f"Dropping {drop_mask.sum()} of {df.shape[0]} rows ({round(100*drop_mask.sum()/df.shape[0])}%)",
+    )
+    df.drop(df[drop_mask].index, inplace=True)
 
     return df
