@@ -5,7 +5,6 @@ from denormalize import denormalize_predictions
 from preprocessing import preprocess_consumption_data, read_consumption_data
 from train_test_split import (
     split_into_cv_folds_and_test_fold,
-    split_into_training_validation_and_test,
 )
 import xgboost as xgb
 from sklearn.metrics import mean_squared_error
@@ -84,7 +83,7 @@ if __name__ == "__main__":
     print("Splitting")
     folds = split_into_cv_folds_and_test_fold(processed_df)
     cv_folds = folds[:-1]
-    results = []
+    results_dfs = []
     for i, (training, validation) in enumerate(cv_folds):
         print(f"CV fold {i}")
         X_train, y_train = training
@@ -99,32 +98,30 @@ if __name__ == "__main__":
         # %%
         results_df = pd.DataFrame(
             {
-                "actual": y_validation,
-                "prediction": y_validation_pred,
+                "actual": y_val,
+                "prediction": y_val_pred,
             },
-            index=y_validation.index,
+            index=y_val.index,
         )
         sd_per_location = raw_df.groupby("location")["consumption"].std()
         mean_per_location = raw_df.groupby("location")["consumption"].mean()
         denormalized_results_df = denormalize_predictions(
             results_df, sd_per_location, mean_per_location
         )
+        results_dfs.append(denormalized_results_df)
+
+    # %%
+    # Merge result dataframes
+    results_df = pd.merge(results_dfs)
 
     # %%
     # Calculate RMSE for denormalized data
-    rmse = np.sqrt(
-        mean_squared_error(
-            denormalized_results_df["actual"], denormalized_results_df["prediction"]
-        )
-    )
+    rmse = np.sqrt(mean_squared_error(results_df["actual"], results_df["prediction"]))
     print(f"RMSE: {rmse}")
 
     # Calculate mean absolute percentage error for denormalized data
     mape = np.mean(
-        np.abs(
-            (denormalized_results_df["actual"] - denormalized_results_df["prediction"])
-            / denormalized_results_df["actual"]
-        )
+        np.abs((results_df["actual"] - results_df["prediction"]) / results_df["actual"])
     )
     print(f"MAPE: {mape}")
 
