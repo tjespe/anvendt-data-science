@@ -46,8 +46,8 @@ def preprocess_consumption_data(df: pd.DataFrame):
         - season: string, the season of the measurement ("winter", "spring", "summer", "fall", can be used as categorical)
         - weekend: bool, whether the measurement was on a weekend
         - weekday: string, the weekday of the measurement ("Monday" - "Sunday", can be used as categorical)
-        - vacation: bool, whether the measurement was during a vacation NOT IMPLEMENTED
-        - days_to_vacation: int, number of days to the next vacation NOT IMPLEMENTED
+        - holiday: bool, whether the measurement was during a holiday NOT IMPLEMENTED
+        - days_to_holiday: int, number of days to the next holiday NOT IMPLEMENTED
         ### Location-based:
         - location: string, one of the 6 cities
         ### Consumption-based:
@@ -70,6 +70,19 @@ def preprocess_consumption_data(df: pd.DataFrame):
         - temperature_7_to_12h_ago: float, avg. forecasted temperature in the hours 7-12 hours ago
         - temperature_13_to_24h_ago: float, avg. forecasted temperature in the hours 13-24 hours ago
     """
+
+    # Merging holidays dataset into consumption dataset
+    holiday_df = read_holiday_data()
+    holiday_norway_df = holiday_df[holiday_df["country"]=='Norway']
+    holiday_finland_df = holiday_df[holiday_df["country"]=='Finland']
+    df["holiday_norway"] = df["time"].dt.date.isin(holiday_norway_df["date"]) & df["location"].isin(["oslo", "bergen", "trondheim", "tromsø", "stavanger"])
+    df["holiday_finland"] = df["time"].dt.date.isin(holiday_finland_df["date"]) & df["location"].isin(["helsingfors"])
+    df["holiday"] = df["holiday_norway"] | df["holiday_finland"]
+    df = df.drop(["holiday_norway", "holiday_finland"], axis=1)
+
+    df["days_to_holiday"] = ...
+
+
     # Extract the hour, month, season, weekday, and weekend
     df["hour"] = df["time"].dt.strftime("%H")
     # df["month"] = df["time"].dt.strftime("%m")
@@ -133,3 +146,23 @@ def preprocess_consumption_data(df: pd.DataFrame):
     df.drop(df[drop_mask].index, inplace=True)
 
     return df
+
+
+def read_holiday_data():
+    """
+    Reads the holiday data from the csv file.
+    Resulting dataframe has columns:
+    - date: datetime, the date of the holiday
+    - event: string, name of the holiday
+    - country: string, country of the holiday
+    """
+    # Read the csv file
+    df = pd.read_csv("data/additional datasets/holidays_2022-2023.csv")
+    # Convert the date column to datetime
+    df["date"] = pd.to_datetime(df["date"]).dt.date
+    # Return the dataframe
+    return df
+
+df = read_consumption_data()
+
+preprocess_consumption_data(df)
