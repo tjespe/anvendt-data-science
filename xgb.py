@@ -8,53 +8,29 @@ from train_test_split import (
 )
 import xgboost as xgb
 from sklearn.metrics import mean_squared_error
-from sklearn.preprocessing import LabelEncoder
-from sklearn.model_selection import TimeSeriesSplit
+import optuna
+import json
+
+import warnings
+
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 
-def preprocess_X_train_for_xgb(X_train: pd.DataFrame):
-    """
-    Preprocessing that is specific to XGBoost.
-    """
-    label_encoders = {}
-    for column in [
-        "hour",
-        # "month",
-        # "season",
-        "weekday",
-        "location",
-    ]:
-        le = LabelEncoder()
-        X_train[column] = le.fit_transform(X_train[column])
-        label_encoders[column] = le
-    X_train["weekend"] = X_train["weekend"].astype(int)
-    return X_train, label_encoders
-
-
-def preprocess_X_test_for_xgb(X_test: pd.DataFrame, label_encoders: dict):
-    """
-    Preprocessing that is specific to XGBoost.
-    """
-    for column in [
-        "hour",
-        # "month",
-        # "season",
-        "weekday",
-        "location",
-    ]:
-        X_test[column] = label_encoders[column].transform(X_test[column])
-    X_test["weekend"] = X_test["weekend"].astype(int)
-    return X_test
-
-
-def train_xgb(X_train: pd.DataFrame, y_train: pd.DataFrame):
+def train_xgb(
+    X_train: pd.DataFrame,
+    y_train: pd.DataFrame,
+    n_estimators=100,
+    max_depth=3,
+    learning_rate=0.1,
+):
     """
     Trains an XGBoost model.
     """
     model = xgb.XGBRegressor(
-        # n_estimators=100, # 100 is default
-        max_depth=8,  # 3 is default
-        # learning_rate=0.1, # 0.1 is default
+        n_estimators=n_estimators,  # 100 is default
+        max_depth=max_depth,  # 3 is default
+        learning_rate=learning_rate,  # 0.1 is default
         verbosity=1,
         objective="reg:squarederror",
         booster="gbtree",
@@ -77,52 +53,131 @@ if __name__ == "__main__":
     # %%
     raw_df = read_consumption_data()
     # %%
-    print("Preprocessing data...")
-    processed_df = preprocess_consumption_data(raw_df)
+    # Drop helsingfors
+    raw_df = raw_df[raw_df["location"] != "helsingfors"]
+
     # %%
-    print("Splitting")
-    folds = split_into_cv_folds_and_test_fold(processed_df)
-    cv_folds = folds[:-1]
-    results_dfs = []
-    for i, (training, validation) in enumerate(cv_folds):
-        print(f"CV fold {i}")
-        X_train, y_train = training
-        X_val, y_val = validation
-        X_train, label_encoders = preprocess_X_train_for_xgb(X_train)
-        X_val = preprocess_X_test_for_xgb(X_val, label_encoders)
-        model = train_xgb(X_train, y_train)
-        y_val_pred = predict_xgb(model, X_val)
-        rmse = np.sqrt(mean_squared_error(y_val, y_val_pred))
-        print(f"RMSE (normalized): {rmse}")
+    def objective(trial):
+        """
+        Use optuna to select hyperparameters
+        """
+        use_rolling = trial.suggest_categorical(
+            "use_rolling_normalization", [True, False]
+        )
+        rolling_normalization_window_days = None
+        if use_rolling:
+            rolling_normalization_window_days = trial.suggest_int(
+                "rolling_normalization_window_days", 5, 100
+            )
+        # Based on results, it seemed like num_splits is not an important hyperparam,
+        # so we set it to a fixes number instead
+        num_splits = 10
+        n_estimators = trial.suggest_int("n_estimators", 1, 10_000, log=True)
+        max_depth = trial.suggest_int("max_depth", 1, 40, log=True)
+        learning_rate = trial.suggest_float("learning_rate", 1e-9, 1, log=True)
+        print(json.dumps(trial.params, indent=4))
 
         # %%
-        results_df = pd.DataFrame(
-            {
-                "actual": y_val,
-                "prediction": y_val_pred,
-            },
-            index=y_val.index,
+        print("Preprocessing data...")
+        processed_df = preprocess_consumption_data(
+            raw_df, rolling_normalization_window_days
         )
-        sd_per_location = raw_df.groupby("location")["consumption"].std()
-        mean_per_location = raw_df.groupby("location")["consumption"].mean()
-        denormalized_results_df = denormalize_predictions(
-            results_df, sd_per_location, mean_per_location
+        # %%
+        print("Splitting")
+        folds = split_into_cv_folds_and_test_fold(processed_df, n_splits=num_splits)
+        cv_folds = folds[:-1]
+        results_dfs = []
+        for i, (training, validation) in enumerate(cv_folds):
+            print(f"CV fold {i}")
+            X_train, y_train = training
+            X_val, y_val = validation
+            X_train = pd.get_dummies(X_train)
+            model = train_xgb(
+                X_train,
+                y_train,
+                max_depth=max_depth,
+                learning_rate=learning_rate,
+                n_estimators=n_estimators,
+            )
+            X_val = pd.get_dummies(X_val)
+            X_val = X_val.reindex(columns=X_train.columns, fill_value=0)[
+                X_train.columns
+            ]
+            y_val_pred = predict_xgb(model, X_val)
+            rmse = np.sqrt(mean_squared_error(y_val, y_val_pred))
+            print(f"RMSE (normalized): {rmse}")
+
+            results_df = pd.DataFrame(
+                {
+                    "actual": y_val,
+                    "prediction": y_val_pred,
+                },
+                index=y_val.index,
+            )
+            denormalized_results_df = denormalize_predictions(
+                results_df, raw_df, rolling_normalization_window_days
+            )
+            denormalized_results_df["fold"] = i
+            results_dfs.append(denormalized_results_df)
+
+        # %%
+        # Merge result dataframes
+        results_df = pd.concat(results_dfs)
+
+        # %%
+        # Calculate RMSE for denormalized data
+        rmse = np.sqrt(
+            mean_squared_error(results_df["actual"], results_df["prediction"])
         )
-        results_dfs.append(denormalized_results_df)
+        print(f"RMSE: {rmse}")
 
-    # %%
-    # Merge result dataframes
-    results_df = pd.merge(results_dfs)
+        # Calculate mean absolute percentage error for denormalized data
+        results_df["PE"] = 100 * (
+            (results_df["actual"] - results_df["prediction"]) / results_df["actual"]
+        )
+        results_df["APE"] = np.abs(results_df["PE"])
+        mape = results_df["APE"].mean()
+        print(f"MAPE: {results_df['APE'].mean()}%")
+        print(
+            "MAPE per",
+            results_df.groupby(
+                results_df.index.get_level_values("location"), observed=True
+            )["APE"].mean(),
+        )
+        print("MAPE per fold", results_df.groupby("fold")["APE"].mean())
+        print("\nMPE per fold", results_df.groupby("fold")["PE"].mean())
 
-    # %%
-    # Calculate RMSE for denormalized data
-    rmse = np.sqrt(mean_squared_error(results_df["actual"], results_df["prediction"]))
-    print(f"RMSE: {rmse}")
+        # %%
+        # Print info about the fold
+        print(
+            "Fold time info:\n",
+            results_df.reset_index().groupby("fold")["time"].agg(["min", "max"]),
+        )
 
-    # Calculate mean absolute percentage error for denormalized data
-    mape = np.mean(
-        np.abs((results_df["actual"] - results_df["prediction"]) / results_df["actual"])
-    )
-    print(f"MAPE: {mape}")
+        # %%
+        # Look at performance in Oslo
+        # for date in results_df.reset_index()["time"].dt.date.unique():
+        #     values_on_date = results_df.reset_index().loc[
+        #         pd.Series(results_df.index.get_level_values("time")).dt.date == date
+        #     ]
+        #     values_on_date[values_on_date["location"] == "oslo"].set_index("time")[
+        #         ["actual", "prediction"]
+        #     ].plot()
+
+        # %%
+        return rmse, mape
+
+    study_name = "XGBoost consumption prediction"
+    try:
+        study = optuna.load_study(study_name=study_name, storage="sqlite:///optuna.db")
+    except KeyError as e:
+        study = optuna.create_study(
+            directions=["minimize", "minimize"],
+            storage="sqlite:///optuna.db",
+            study_name=study_name,
+        )
+
+    study.optimize(objective, n_trials=100)
+
 
 # %%
