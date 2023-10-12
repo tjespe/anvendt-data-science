@@ -14,7 +14,13 @@ def preprocess_X_train_for_xgb(X_train: pd.DataFrame):
     Preprocessing that is specific to XGBoost.
     """
     label_encoders = {}
-    for column in ["hour", "month", "season", "weekday", "location"]:
+    for column in [
+        "hour",
+        # "month",
+        # "season",
+        "weekday",
+        "location",
+    ]:
         le = LabelEncoder()
         X_train[column] = le.fit_transform(X_train[column])
         label_encoders[column] = le
@@ -26,7 +32,13 @@ def preprocess_X_test_for_xgb(X_test: pd.DataFrame, label_encoders: dict):
     """
     Preprocessing that is specific to XGBoost.
     """
-    for column in ["hour", "month", "season", "weekday", "location"]:
+    for column in [
+        "hour",
+        # "month",
+        # "season",
+        "weekday",
+        "location",
+    ]:
         X_test[column] = label_encoders[column].transform(X_test[column])
     X_test["weekend"] = X_test["weekend"].astype(int)
     return X_test
