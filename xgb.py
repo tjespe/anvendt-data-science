@@ -8,43 +8,8 @@ from train_test_split import (
 )
 import xgboost as xgb
 from sklearn.metrics import mean_squared_error
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import OrdinalEncoder
 from sklearn.model_selection import TimeSeriesSplit
-
-
-def preprocess_X_train_for_xgb(X_train: pd.DataFrame):
-    """
-    Preprocessing that is specific to XGBoost.
-    """
-    label_encoders = {}
-    for column in [
-        "hour",
-        # "month",
-        # "season",
-        "weekday",
-        "location",
-    ]:
-        le = LabelEncoder()
-        X_train[column] = le.fit_transform(X_train[column])
-        label_encoders[column] = le
-    X_train["weekend"] = X_train["weekend"].astype(int)
-    return X_train, label_encoders
-
-
-def preprocess_X_test_for_xgb(X_test: pd.DataFrame, label_encoders: dict):
-    """
-    Preprocessing that is specific to XGBoost.
-    """
-    for column in [
-        "hour",
-        # "month",
-        # "season",
-        "weekday",
-        "location",
-    ]:
-        X_test[column] = label_encoders[column].transform(X_test[column])
-    X_test["weekend"] = X_test["weekend"].astype(int)
-    return X_test
 
 
 def train_xgb(X_train: pd.DataFrame, y_train: pd.DataFrame):
@@ -87,16 +52,19 @@ if __name__ == "__main__":
     )
     # %%
     print("Splitting")
-    folds = split_into_cv_folds_and_test_fold(processed_df)
+    folds = split_into_cv_folds_and_test_fold(processed_df, n_splits=10)
     cv_folds = folds[:-1]
     results_dfs = []
     for i, (training, validation) in enumerate(cv_folds):
         print(f"CV fold {i}")
         X_train, y_train = training
         X_val, y_val = validation
-        X_train, label_encoders = preprocess_X_train_for_xgb(X_train)
-        X_val = preprocess_X_test_for_xgb(X_val, label_encoders)
+        # X_train, ordinal_encoders = preprocess_X_train_for_xgb(X_train)
+        # X_val = preprocess_X_test_for_xgb(X_val, ordinal_encoders)
+        X_train = pd.get_dummies(X_train)
         model = train_xgb(X_train, y_train)
+        X_val = pd.get_dummies(X_val)
+        X_val = X_val.reindex(columns=X_train.columns, fill_value=0)[X_train.columns]
         y_val_pred = predict_xgb(model, X_val)
         rmse = np.sqrt(mean_squared_error(y_val, y_val_pred))
         print(f"RMSE (normalized): {rmse}")
@@ -124,9 +92,10 @@ if __name__ == "__main__":
     print(f"RMSE: {rmse}")
 
     # Calculate mean absolute percentage error for denormalized data
-    results_df["APE"] = 100 * np.abs(
+    results_df["PE"] = 100 * (
         (results_df["actual"] - results_df["prediction"]) / results_df["actual"]
     )
+    results_df["APE"] = np.abs(results_df["PE"])
     print(f"MAPE: {results_df['APE'].mean()}%")
     print(
         "MAPE per",
@@ -135,15 +104,24 @@ if __name__ == "__main__":
         )["APE"].mean(),
     )
     print("MAPE per fold", results_df.groupby("fold")["APE"].mean())
+    print("\nMPE per fold", results_df.groupby("fold")["PE"].mean())
+
+    # %%
+    # Print info about the fold
+    print(
+        "Fold time info:\n",
+        results_df.reset_index().groupby("fold")["time"].agg(["min", "max"]),
+    )
 
     # %%
     # Look at performance in Oslo
     for date in results_df.reset_index()["time"].dt.date.unique():
-        results_df[
-            (results_df["fold"] == 3)
-            & (results_df.index.get_level_values("location") == "oslo")
-            & (pd.Series(results_df.index.get_level_values("time")).dt.date == date)
-        ][["actual", "prediction"]].plot()
+        values_on_date = results_df.reset_index().loc[
+            pd.Series(results_df.index.get_level_values("time")).dt.date == date
+        ]
+        values_on_date[values_on_date["location"] == "oslo"].set_index("time")[
+            ["actual", "prediction"]
+        ].plot()
 
 
 # %%

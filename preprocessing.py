@@ -92,16 +92,16 @@ def preprocess_consumption_data(df: pd.DataFrame, rolling_normalization_window_d
 
     # Extract the hour, month, season, weekday, and weekend
     df["hour"] = df["time"].dt.strftime("%H")
-    # df["month"] = df["time"].dt.strftime("%m")
-    # df["season"] = df["time"].dt.month.apply(
-    #     lambda x: "winter"
-    #     if x in [12, 1, 2]
-    #     else "spring"
-    #     if x in [3, 4, 5]
-    #     else "summer"
-    #     if x in [6, 7, 8]
-    #     else "fall"
-    # )
+    # df["month"] = df["time"].dt.strftime("%m") # MAPE reduced by removeing feature
+    df["season"] = df["time"].dt.month.apply(
+        lambda x: "winter"
+        if x in [12, 1, 2]
+        else "spring"
+        if x in [3, 4, 5]
+        else "summer"
+        if x in [6, 7, 8]
+        else "fall"
+    )
     df["weekday"] = df["time"].dt.day_name()
     df["weekend"] = df["weekday"].isin(["Saturday", "Sunday"])
 
