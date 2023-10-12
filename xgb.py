@@ -3,10 +3,14 @@ import pandas as pd
 import numpy as np
 from denormalize import denormalize_predictions
 from preprocessing import preprocess_consumption_data, read_consumption_data
-from train_test_split import split_into_training_validation_and_test
+from train_test_split import (
+    split_into_cv_folds_and_test_fold,
+    split_into_training_validation_and_test,
+)
 import xgboost as xgb
 from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import TimeSeriesSplit
 
 
 def preprocess_X_train_for_xgb(X_train: pd.DataFrame):
@@ -78,36 +82,33 @@ if __name__ == "__main__":
     processed_df = preprocess_consumption_data(raw_df)
     # %%
     print("Splitting")
-    (
-        X_train,
-        y_train,
-        X_validation,
-        y_validation,
-        _X_test,  # We should not use this data yet
-        _y_test,  # We should not use this data yet
-    ) = split_into_training_validation_and_test(processed_df)
+    folds = split_into_cv_folds_and_test_fold(processed_df)
+    cv_folds = folds[:-1]
+    results = []
+    for i, (training, validation) in enumerate(cv_folds):
+        print(f"CV fold {i}")
+        X_train, y_train = training
+        X_val, y_val = validation
+        X_train, label_encoders = preprocess_X_train_for_xgb(X_train)
+        X_val = preprocess_X_test_for_xgb(X_val, label_encoders)
+        model = train_xgb(X_train, y_train)
+        y_val_pred = predict_xgb(model, X_val)
+        rmse = np.sqrt(mean_squared_error(y_val, y_val_pred))
+        print(f"RMSE (normalized): {rmse}")
 
-    X_train, label_encoders = preprocess_X_train_for_xgb(X_train)
-    X_validation = preprocess_X_test_for_xgb(X_validation, label_encoders)
-
-    model = train_xgb(X_train, y_train)
-    y_validation_pred = predict_xgb(model, X_validation)
-    rmse = np.sqrt(mean_squared_error(y_validation, y_validation_pred))
-    print(f"RMSE (normalized): {rmse}")
-
-    # %%
-    results_df = pd.DataFrame(
-        {
-            "actual": y_validation,
-            "prediction": y_validation_pred,
-        },
-        index=y_validation.index,
-    )
-    sd_per_location = raw_df.groupby("location")["consumption"].std()
-    mean_per_location = raw_df.groupby("location")["consumption"].mean()
-    denormalized_results_df = denormalize_predictions(
-        results_df, sd_per_location, mean_per_location
-    )
+        # %%
+        results_df = pd.DataFrame(
+            {
+                "actual": y_validation,
+                "prediction": y_validation_pred,
+            },
+            index=y_validation.index,
+        )
+        sd_per_location = raw_df.groupby("location")["consumption"].std()
+        mean_per_location = raw_df.groupby("location")["consumption"].mean()
+        denormalized_results_df = denormalize_predictions(
+            results_df, sd_per_location, mean_per_location
+        )
 
     # %%
     # Calculate RMSE for denormalized data

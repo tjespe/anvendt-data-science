@@ -70,14 +70,6 @@ def preprocess_consumption_data(df: pd.DataFrame):
         - temperature_7_to_12h_ago: float, avg. forecasted temperature in the hours 7-12 hours ago
         - temperature_13_to_24h_ago: float, avg. forecasted temperature in the hours 13-24 hours ago
     """
-    # Define the type of each row (training, test, validation)
-    # Most days are training
-    df["type"] = "training"
-    # Every 10th day is validation
-    df.loc[df["time"].dt.day % 10 == 0, "type"] = "validation"
-    # Every 10th day is test, but with an offset of 5 days
-    df.loc[df["time"].dt.day % 10 == 5, "type"] = "test"
-
     # Extract the hour, month, season, weekday, and weekend
     df["hour"] = df["time"].dt.strftime("%H")
     # df["month"] = df["time"].dt.strftime("%m")
@@ -101,61 +93,16 @@ def preprocess_consumption_data(df: pd.DataFrame):
         lambda x: (x - x.mean()) / x.std()
     )
     for lookback in [4, 7, 14]:
-        df.loc[df["type"] == "training", f"mean_consumption_{lookback}d"] = (
-            df.loc[df["type"] == "training"].groupby(["hour", "location"])[
-                "consumption_normalized"
-            ]
-            # **NB**: This is a bit simplified. There might be a test of validation day
-            # in the 7 days preceding the measurement, and since we have excluded those
-            # from the mean, the mean is not exactly the mean of the 7 days preceding
-            # the measurement. It might be the previous 8 or 9 days (but only a mean of
-            # 7 of the days is used).
-            .transform(lambda x: x.shift(5 * 24).rolling(lookback * 24).mean())
-        )
-        df.loc[df["type"] == "validation", f"mean_consumption_{lookback}d"] = (
-            df.loc[(df["type"] == "validation") | (df["type"] == "training")]
-            .groupby(["hour", "location"])["consumption_normalized"]
-            .transform(lambda x: x.shift(5 * 24).rolling(lookback * 24).mean())
-        )
-        df.loc[df["type"] == "test", f"mean_consumption_{lookback}d"] = df.groupby(
-            ["hour", "location"]
-        )["consumption_normalized"].transform(
-            lambda x: x.shift(5 * 24).rolling(lookback * 24).mean()
-        )
+        df.loc[f"mean_consumption_{lookback}d"] = df.groupby(["hour", "location"])[
+            "consumption_normalized"
+        ].transform(lambda x: x.shift(5 * 24).rolling(lookback * 24).mean())
 
-    # TODO: Consider whether this data leak is a problem
-    df["consumption_1w_ago"] = df.groupby("location")[
-        "consumption_normalized"
-    ].transform(lambda x: x.shift(7 * 24))
     for weekday in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]:
         df.loc[
-            (df["type"] == "training") & (df["weekday"] == weekday),
+            (df["weekday"] == weekday),
             f"consumption_1w_ago",
         ] = (
-            df.loc[(df["type"] == "training") & (df["weekday"] == weekday)].groupby(
-                "location"
-            )["consumption_normalized"]
-            # **NB**: This is a bit simplified. If the measurement is on a Monday,
-            # and the last Monday was a test or validation day, this code will select
-            # the Monday before that.
-            .transform(lambda x: x.shift(24))
-        )
-        df.loc[
-            (df["type"] == "validation") & (df["weekday"] == weekday),
-            f"consumption_1w_ago",
-        ] = (
-            df.loc[
-                ((df["type"] == "training") | (df["type"] == "validation"))
-                & (df["weekday"] == weekday)
-            ]
-            .groupby("location")["consumption_normalized"]
-            .transform(lambda x: x.shift(24))
-        )
-        df.loc[
-            (df["type"] == "test") & (df["weekday"] == weekday),
-            f"consumption_1w_ago",
-        ] = (
-            df.loc[df["weekday"] == weekday]
+            df.loc[(df["weekday"] == weekday)]
             .groupby("location")["consumption_normalized"]
             .transform(lambda x: x.shift(24))
         )
@@ -164,10 +111,6 @@ def preprocess_consumption_data(df: pd.DataFrame):
     df = df.drop(columns=["consumption"])
 
     # Extract the temperature features
-    # TODO: There is perhaps some potential for data leakage here, since the
-    # temperature is averaged across hours that might be in the previous day,
-    # and the previous day might be a test or validation day. However, since
-    # the temperature is not a target variable, this should not be a problem.
     df["temperature_1h_ago"] = df.groupby("location")["temperature"].transform(
         lambda x: x.shift(1)
     )
