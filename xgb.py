@@ -66,7 +66,7 @@ if __name__ == "__main__":
         # Based on results, it seemed like num_splits is not an important hyperparam,
         # so we set it to a fixes number instead
         num_splits = 10
-        n_estimators = trial.suggest_int("n_estimators", 1, 100, log=True)
+        n_estimators = trial.suggest_int("n_estimators", 1, 2000, log=True)
         max_depth = trial.suggest_int("max_depth", 1, 40, log=True)
         learning_rate = trial.suggest_float("learning_rate", 1e-9, 1, log=True)
         # subsample = trial.suggest_float("subsample", 0.1, 1)
@@ -195,6 +195,7 @@ if __name__ == "__main__":
         (useful for simple testing)
         """
 
+        use_normalization = True
         rolling_normalization_window_days = None
         num_splits = 10
         n_estimators = 50
@@ -204,7 +205,11 @@ if __name__ == "__main__":
             raw_df, rolling_normalization_window_days
         )
         folds = split_into_cv_folds_and_test_fold(
-            processed_df, n_splits=num_splits, target_variable="consumption"
+            processed_df,
+            n_splits=num_splits,
+            target_variable="consumption_normalized"
+            if use_normalization
+            else "consumption",
         )
         training, validation = folds[-2]
         X_train, y_train = training
@@ -230,10 +235,12 @@ if __name__ == "__main__":
             },
             index=y_val.index,
         )
-        # denormalized_results_df = denormalize_predictions(
-        #     results_df, raw_df, rolling_normalization_window_days
-        # )
-        denormalized_results_df = results_df
+        if use_normalization:
+            denormalized_results_df = denormalize_predictions(
+                results_df, raw_df, rolling_normalization_window_days
+            )
+        else:
+            denormalized_results_df = results_df
 
         # Calculate RMSE for denormalized data
         rmse = np.sqrt(
