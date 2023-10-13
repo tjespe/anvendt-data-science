@@ -1,5 +1,6 @@
 # %%
 import json
+import numpy as np
 import optuna
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -11,11 +12,16 @@ if __name__ == "__main__":
     This file analyzes the results from Optuna's feature selection tuning.
     """
     # %%
+    # Samplers that work in this case include:
+    # - NSGAIISampler
+    # - TPESampler
+    # Change the sampler both here and in `xgb.py` to run different studies
     sampler = optuna.samplers.TPESampler()
     study_name = (
         f"XGBoost consumption prediction feature selection {sampler.__class__.__name__}"
     )
-    study = optuna.load_study(study_name=study_name, storage="sqlite:///optuna.db")
+    storage = "sqlite:///optuna.db"
+    study = optuna.load_study(study_name=study_name, storage=storage)
     filtered_trials = lambda: [
         t
         for t in study.trials
@@ -36,18 +42,19 @@ if __name__ == "__main__":
     all_params = set(
         param for trial in filtered_trials() for param in trial.params.keys()
     )
-    feature_params = [param for param in all_params if param.startswith("use_feature_")]
+    params = [param for param in all_params if param.startswith("use_feature_")]
+    features = [param.replace("use_feature_", "") for param in params]
     df = pd.DataFrame(
         [
             [
                 trial.values[0],
                 trial.values[1],
             ]
-            + [trial.params.get(param) for param in feature_params]
+            + [trial.params.get(param) for param in params]
             for trial in filtered_trials()
             if trial.values
         ],
-        columns=["RMSE", "MAPE", *feature_params],
+        columns=["RMSE", "MAPE", *features],
     )
     feature_inclusion_stats = pd.DataFrame(
         columns=[
@@ -62,18 +69,20 @@ if __name__ == "__main__":
         ],
     )
     feature_inclusion_stats.set_index(["Feature", "Metric"], inplace=True)
-    for param in feature_params:
+    for feature in features:
         for metric in ["RMSE", "MAPE"]:
-            grouped = df.groupby(param)[metric]
+            grouped = df.groupby(feature)[metric]
             means = grouped.agg("mean")
             counts = grouped.agg("count")
-            t_stat, p_value = stats.ttest_ind(
-                grouped.get_group(0),
-                grouped.get_group(1),
-                equal_var=True,
-                alternative="greater",
-            )
-            feature = param.replace("use_feature_", "")
+            if len(grouped.groups) > 1:
+                t_stat, p_value = stats.ttest_ind(
+                    grouped.get_group(0),
+                    grouped.get_group(1),
+                    equal_var=True,
+                    alternative="greater",
+                )
+            else:
+                continue
             feature_inclusion_stats.loc[(feature, metric), :] = [
                 float(means.loc[1]),
                 float(means.loc[0]),
@@ -86,18 +95,33 @@ if __name__ == "__main__":
 
     # %%
     print(
-        "Statistically significant features (p < 0.05):",
-        json.dumps(
-            list(
-                set(
-                    feature_inclusion_stats[
-                        feature_inclusion_stats["p-value"] < 0.05
-                    ].index.get_level_values("Feature")
-                )
-            ),
-            indent=4,
-        ),
+        "Number of unique combinations tested:",
+        len(set(tuple(vals) for vals in df.values[:, 2:])),
     )
+
+    # %%
+    # List significant features
+    for level, thresh in [("Significant", 0.05), ("Strongly significant", 0.01)]:
+        signifcant_MAPE_p_value = set(
+            feature_inclusion_stats[
+                (feature_inclusion_stats["p-value"] < thresh)
+                & (feature_inclusion_stats.index.get_level_values("Metric") == "MAPE")
+            ].index.get_level_values("Feature")
+        )
+        signifcant_RMSE_p_value = set(
+            feature_inclusion_stats[
+                (feature_inclusion_stats["p-value"] < thresh)
+                & (feature_inclusion_stats.index.get_level_values("Metric") == "RMSE")
+            ].index.get_level_values("Feature")
+        )
+        significant = signifcant_MAPE_p_value & signifcant_RMSE_p_value
+        print(
+            f"{level} features (both MAPE p value and RMSE p value < {thresh}):",
+            json.dumps(
+                list(significant),
+                indent=4,
+            ),
+        )
 
     # %%
     print(

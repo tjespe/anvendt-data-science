@@ -17,6 +17,25 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 
+# These are features that we are sure improves the model based on
+# previous analysis. Thus, Optuna is not given the choice on
+# whether or not to include them.
+# All these have a p-value < 0.01 for reducing both MAPE and RMSE,
+# and have been evaluated with a common sense check.
+# **NB**: When this list is changed, any feature selection studies
+# should be deleted so that Optuna forgets what it has learned.
+manually_chosen_features = {
+    "consumption_1w_ago_normalized",
+    "temperature",
+    "temperature_4_to_6h_ago",
+    "temperature_7_to_12h_ago",
+    "temperature_1w_ago",
+    "temperature_prev_prev_week",
+    "mean_consumption_at_hour_4d_normalized",
+    "mean_consumption_at_hour_7d_normalized",
+}
+
+
 def train_xgb(X_train: pd.DataFrame, y_train: pd.DataFrame, **params):
     """
     Trains an XGBoost model.
@@ -46,7 +65,7 @@ if __name__ == "__main__":
     raw_df = raw_df[raw_df["location"] != "helsingfors"]
 
     # %%
-    do_feature_selection = True
+    do_feature_selection = False
 
     def objective(trial):
         """
@@ -63,11 +82,12 @@ if __name__ == "__main__":
             max_depth = 8  # 12 was better
             learning_rate = 0.1
         else:
-            use_normalization = trial.suggest_categorical(
-                "use_target_normalization", [True, False]
-            )
+            use_normalization = True  # trial.suggest_categorical("use_target_normalization", [True, False])
+            use_rolling = False
             if use_normalization:
-                use_rolling = False  # trial.suggest_categorical("use_rolling_normalization", [True, False])
+                use_rolling = trial.suggest_categorical(
+                    "use_rolling_normalization", [True, False]
+                )
             rolling_normalization_window_days = None
             if use_rolling:
                 rolling_normalization_window_days = trial.suggest_int(
@@ -103,11 +123,14 @@ if __name__ == "__main__":
         features = list(folds[0][0][0].columns)
         features_to_use = []
         if do_feature_selection:
+            features_to_use += manually_chosen_features
             for feature in features:
+                if feature in manually_chosen_features:
+                    continue
                 if trial.suggest_int(f"use_feature_{feature}", 0, 1):
                     features_to_use.append(feature)
         else:
-            features_to_use = features
+            features_to_use = list(manually_chosen_features)
         print(json.dumps(trial.params, indent=4))
         if not features_to_use:
             return float("inf"), float("inf")
@@ -180,15 +203,15 @@ if __name__ == "__main__":
                 results_df.index.get_level_values("location"), observed=True
             )["APE"].mean(),
         )
-        print("MAPE per fold", results_df.groupby("fold")["APE"].mean())
-        print("\nMPE per fold", results_df.groupby("fold")["PE"].mean())
-
-        # %%
-        # Print info about the fold
-        print(
-            "Fold time info:\n",
-            results_df.reset_index().groupby("fold")["time"].agg(["min", "max"]),
+        fold_stats = (
+            results_df.reset_index().groupby("fold")["time"].agg(["min", "max"])
         )
+        fold_stats.columns = ["From", "To"]
+        fold_stats["MAPE"] = results_df.groupby("fold")["APE"].mean()
+        fold_stats["MPE"] = results_df.groupby("fold")["PE"].mean()
+        fold_stats.From = fold_stats.From.dt.strftime("%d. %b")
+        fold_stats.To = fold_stats.To.dt.strftime("%d. %b")
+        print(fold_stats)
 
         # %%
         # Look at performance in Oslo
@@ -204,7 +227,7 @@ if __name__ == "__main__":
         return rmse, mape
 
     # %%
-    sampler = optuna.samplers.TPESampler()
+    sampler = optuna.samplers.NSGAIIISampler()
     study_name = f"XGBoost consumption prediction {'feature selection ' if do_feature_selection else ''}{sampler.__class__.__name__}"
     # %%
     try:

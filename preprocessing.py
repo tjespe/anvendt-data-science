@@ -175,6 +175,24 @@ def preprocess_consumption_data(df: pd.DataFrame, rolling_normalization_window_d
     df["temperature_13_to_24h_ago"] = df.groupby("location", observed=True)[
         "temperature"
     ].transform(lambda x: x.shift(13).rolling(12).mean())
+    df["temperature_prev_week"] = df.groupby("location", observed=True)[
+        "temperature"
+    ].transform(lambda x: x.shift(25).rolling(6 * 24).mean())
+    df["temperature_1w_ago"] = df.groupby(
+        ["location", "hour", "weekday"], observed=True
+    )["temperature"].transform(lambda x: x.shift(1))
+    df["temperature_prev_prev_week"] = df.groupby("location", observed=True)[
+        "temperature"
+    ].transform(lambda x: x.shift(6 * 24 + 25).rolling(7 * 24).mean())
+    df["temperature_2w_ago"] = df.groupby(
+        ["location", "hour", "weekday"], observed=True
+    )["temperature"].transform(lambda x: x.shift(2))
+    df["temperature_prev_prev_prev_week"] = df.groupby("location", observed=True)[
+        "temperature"
+    ].transform(lambda x: x.shift(13 * 24 + 25).rolling(7 * 24).mean())
+    df["temperature_3w_ago"] = df.groupby(
+        ["location", "hour", "weekday"], observed=True
+    )["temperature"].transform(lambda x: x.shift(3))
 
     # Some rows have NaN because of the lookback features, but since there are so few,
     # we drop them

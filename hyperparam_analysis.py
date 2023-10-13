@@ -11,7 +11,7 @@ if __name__ == "__main__":
     This file analyzes the results from Optuna's hyperparameter tuning.
     """
     # %%
-    sampler = optuna.samplers.NSGAIISampler()
+    sampler = optuna.samplers.NSGAIIISampler()
     study_name = f"XGBoost consumption prediction {sampler.__class__.__name__}"
     study = optuna.load_study(study_name=study_name, storage="sqlite:///optuna.db")
     filtered_trials = lambda: [
@@ -155,7 +155,7 @@ if __name__ == "__main__":
         rmse_no_rolling = grouped.get_group(False)
         rmse_rolling = grouped.get_group(True)
         t_stat_rmse, p_value_rmse = stats.ttest_ind(
-            rmse_no_rolling, rmse_rolling, equal_var=False, alternative="less"
+            rmse_no_rolling, rmse_rolling, equal_var=False, alternative="greater"
         )
         print("p-value:", p_value_rmse)
 
@@ -167,7 +167,7 @@ if __name__ == "__main__":
         rmse_no_rolling = grouped.get_group(False)
         rmse_rolling = grouped.get_group(True)
         t_stat_rmse, p_value_rmse = stats.ttest_ind(
-            rmse_no_rolling, rmse_rolling, equal_var=False, alternative="less"
+            rmse_no_rolling, rmse_rolling, equal_var=False, alternative="greater"
         )
         print("p-value:", p_value_rmse)
 
