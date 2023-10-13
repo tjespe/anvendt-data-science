@@ -12,7 +12,7 @@ if __name__ == "__main__":
     # %%
     study_name = "XGBoost consumption prediction"
     study = optuna.load_study(study_name=study_name, storage="sqlite:///optuna.db")
-    filtered_trials = [
+    filtered_trials = lambda: [
         t
         for t in study.trials
         if t.state == optuna.trial.TrialState.COMPLETE and t.values
@@ -48,11 +48,21 @@ if __name__ == "__main__":
     fig.show()
 
     # %%
+    # Show RMSE for different combos of n_estimators and max_depth
+    fig = optuna.visualization.plot_contour(
+        study,
+        target=lambda t: t.values[0],
+        params=["n_estimators", "max_depth"],
+        target_name="RMSE",
+    )
+    fig.show()
+
+    # %%
     # Show how RMSE changes for different rolling_normalization_window_days
     relevant_trials = sorted(
         [
             trial
-            for trial in filtered_trials
+            for trial in filtered_trials()
             if "rolling_normalization_window_days" in trial.params
         ],
         key=lambda trial: trial.params["rolling_normalization_window_days"],
@@ -81,7 +91,7 @@ if __name__ == "__main__":
         relevant_trials = sorted(
             [
                 trial
-                for trial in filtered_trials
+                for trial in filtered_trials()
                 if trial.values and hyperparam in trial.params
             ],
             key=lambda trial: trial.params[hyperparam],
@@ -125,7 +135,7 @@ if __name__ == "__main__":
                 trial.values[0],
                 trial.values[1],
             )
-            for trial in filtered_trials
+            for trial in filtered_trials()
             if trial.values
         ],
         columns=["use_normalization", "use_rolling_normalization", "RMSE", "MAPE"],
@@ -155,9 +165,65 @@ if __name__ == "__main__":
         rmse_no_rolling = grouped.get_group(False)
         rmse_rolling = grouped.get_group(True)
         t_stat_rmse, p_value_rmse = stats.ttest_ind(
-            rmse_no_rolling, rmse_rolling, equal_var=True, alternative="greater"
+            rmse_no_rolling, rmse_rolling, equal_var=False, alternative="less"
         )
         print("p-value:", p_value_rmse)
+
+    # %%
+    # Check effect of including each feature
+    all_params = set(
+        param for trial in filtered_trials() for param in trial.params.keys()
+    )
+    feature_params = [
+        param
+        for param in all_params
+        if param.startswith("use_")
+        and param not in {"use_target_normalization", "use_rolling_normalization"}
+    ]
+    df = pd.DataFrame(
+        [
+            [
+                trial.values[0],
+                trial.values[1],
+            ]
+            + [trial.params.get(param) for param in feature_params]
+            for trial in filtered_trials()
+            if trial.values
+        ],
+        columns=["RMSE", "MAPE", *feature_params],
+    )
+    feature_inclusion_stats = pd.DataFrame(
+        columns=[
+            "Mean (True)",
+            "Mean (False)",
+            "p-value",
+            "t stat",
+            "Feature",
+            "Metric",
+        ],
+    )
+    print(feature_inclusion_stats)
+    feature_inclusion_stats.set_index(["Feature", "Metric"], inplace=True)
+    print(feature_inclusion_stats)
+    for param in feature_params:
+        for metric in ["RMSE", "MAPE"]:
+            print(feature_inclusion_stats)
+            means = df.groupby(param)[metric].agg("mean")
+            grouped = df.groupby(param)[metric]
+            t_stat, p_value = stats.ttest_ind(
+                grouped.get_group(False),
+                grouped.get_group(True),
+                equal_var=True,
+                alternative="less",
+            )
+            print(feature_inclusion_stats, feature_inclusion_stats.index)
+            feature_inclusion_stats.loc[(param, metric), :] = [
+                float(means.loc[True]),
+                float(means.loc[False]),
+                float(p_value),
+                float(t_stat),
+            ]
+    feature_inclusion_stats
 
     # %%
     # Show hyperparameter importance for RMSE

@@ -67,7 +67,7 @@ if __name__ == "__main__":
         # so we set it to a fixes number instead
         num_splits = 10
         n_estimators = trial.suggest_int("n_estimators", 1, 2000, log=True)
-        max_depth = trial.suggest_int("max_depth", 1, 40, log=True)
+        max_depth = trial.suggest_int("max_depth", 1, 20, log=True)
         learning_rate = trial.suggest_float("learning_rate", 1e-9, 1, log=True)
         # subsample = trial.suggest_float("subsample", 0.1, 1)
         # colsample_bytree = trial.suggest_float("colsample_bytree", 0.1, 1)
@@ -89,12 +89,21 @@ if __name__ == "__main__":
             if use_normalization
             else "consumption",
         )
+        # %%
+        # Select features
+        features = list(folds[0][0][0].columns)
+        features_to_use = []
+        for feature in features:
+            if trial.suggest_categorical(f"use_{feature}", [True, False]):
+                features_to_use.append(feature)
+        # %%
         cv_folds = folds[:-1]
         results_dfs = []
         for i, (training, validation) in enumerate(cv_folds):
             print(f"CV fold {i}")
             X_train, y_train = training
             X_val, y_val = validation
+            X_train = X_train[features_to_use]
             X_train = pd.get_dummies(X_train)
             model = train_xgb(
                 X_train,
@@ -107,6 +116,7 @@ if __name__ == "__main__":
                 # gamma=gamma,
                 # reg_lambda=reg_lambda,
             )
+            X_val = X_val[features_to_use]
             X_val = pd.get_dummies(X_val)
             X_val = X_val.reindex(columns=X_train.columns, fill_value=0)[
                 X_train.columns
