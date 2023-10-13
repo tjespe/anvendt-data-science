@@ -46,31 +46,43 @@ if __name__ == "__main__":
     raw_df = raw_df[raw_df["location"] != "helsingfors"]
 
     # %%
+    do_feature_selection = True
+
     def objective(trial):
         """
         Use optuna to select hyperparameters
         """
-        use_normalization = trial.suggest_categorical(
-            "use_target_normalization", [True, False]
-        )
-        use_rolling = False
-        if use_normalization:
-            use_rolling = False  # trial.suggest_categorical("use_rolling_normalization", [True, False])
-        rolling_normalization_window_days = None
-        if use_rolling:
-            rolling_normalization_window_days = trial.suggest_int(
-                "rolling_normalization_window_days", 5, 100
+        if do_feature_selection:
+            use_normalization = True
+            use_rolling = False
+            rolling_normalization_window_days = None
+            num_splits = 10
+            n_estimators = (
+                250  # 700 was better, but we use fewer here to make it faster
             )
-        # Based on results, it seemed like num_splits is not an important hyperparam,
-        # so we set it to a fixes number instead
-        num_splits = 10
-        n_estimators = trial.suggest_int("n_estimators", 1, 2000, log=True)
-        max_depth = trial.suggest_int("max_depth", 1, 20, log=True)
-        learning_rate = trial.suggest_float("learning_rate", 1e-9, 1, log=True)
-        # subsample = trial.suggest_float("subsample", 0.1, 1)
-        # colsample_bytree = trial.suggest_float("colsample_bytree", 0.1, 1)
-        # gamma = trial.suggest_float("gamma", 0, 1)
-        # reg_lambda = trial.suggest_float("reg_lambda", 1e-8, 1.0, log=True)
+            max_depth = 8  # 12 was better
+            learning_rate = 0.1
+        else:
+            use_normalization = trial.suggest_categorical(
+                "use_target_normalization", [True, False]
+            )
+            if use_normalization:
+                use_rolling = False  # trial.suggest_categorical("use_rolling_normalization", [True, False])
+            rolling_normalization_window_days = None
+            if use_rolling:
+                rolling_normalization_window_days = trial.suggest_int(
+                    "rolling_normalization_window_days", 5, 100
+                )
+            # Based on results, it seemed like num_splits is not an important hyperparam,
+            # so we set it to a fixes number instead
+            num_splits = 10
+            n_estimators = trial.suggest_int("n_estimators", 1, 2000, log=True)
+            max_depth = trial.suggest_int("max_depth", 1, 20, log=True)
+            learning_rate = trial.suggest_float("learning_rate", 1e-9, 1, log=True)
+            # subsample = trial.suggest_float("subsample", 0.1, 1)
+            # colsample_bytree = trial.suggest_float("colsample_bytree", 0.1, 1)
+            # gamma = trial.suggest_float("gamma", 0, 1)
+            # reg_lambda = trial.suggest_float("reg_lambda", 1e-8, 1.0, log=True)
 
         # %%
         print("Preprocessing data...")
@@ -90,9 +102,12 @@ if __name__ == "__main__":
         # Select features
         features = list(folds[0][0][0].columns)
         features_to_use = []
-        for feature in features:
-            if trial.suggest_int(f"use_feature_{feature}", 0, 1):
-                features_to_use.append(feature)
+        if do_feature_selection:
+            for feature in features:
+                if trial.suggest_int(f"use_feature_{feature}", 0, 1):
+                    features_to_use.append(feature)
+        else:
+            features_to_use = features
         print(json.dumps(trial.params, indent=4))
         if not features_to_use:
             return float("inf"), float("inf")
@@ -189,8 +204,8 @@ if __name__ == "__main__":
         return rmse, mape
 
     # %%
-    sampler = optuna.samplers.NSGAIISampler()
-    study_name = f"XGBoost consumption prediction {sampler.__class__.__name__}"
+    sampler = optuna.samplers.TPESampler()
+    study_name = f"XGBoost consumption prediction {'feature selection ' if do_feature_selection else ''}{sampler.__class__.__name__}"
     # %%
     try:
         study = optuna.load_study(study_name=study_name, storage="sqlite:///optuna.db")
@@ -202,77 +217,6 @@ if __name__ == "__main__":
             sampler=sampler,
         )
 
-    def one_fold_validation():
-        """
-        Get validation scores for the current set of chosen parameters
-        (useful for simple testing)
-        """
-
-        use_normalization = True
-        rolling_normalization_window_days = None
-        num_splits = 10
-        n_estimators = 50
-        max_depth = 8
-        learning_rate = 0.03
-        processed_df = preprocess_consumption_data(
-            raw_df, rolling_normalization_window_days
-        )
-        folds = split_into_cv_folds_and_test_fold(
-            processed_df,
-            n_splits=num_splits,
-            target_variable="consumption_normalized"
-            if use_normalization
-            else "consumption",
-        )
-        training, validation = folds[-2]
-        X_train, y_train = training
-        X_val, y_val = validation
-        X_train = pd.get_dummies(X_train)
-        model = train_xgb(
-            X_train,
-            y_train,
-            max_depth=max_depth,
-            learning_rate=learning_rate,
-            n_estimators=n_estimators,
-        )
-        X_val = pd.get_dummies(X_val)
-        X_val = X_val.reindex(columns=X_train.columns, fill_value=0)[X_train.columns]
-        y_val_pred = predict_xgb(model, X_val)
-        rmse = np.sqrt(mean_squared_error(y_val, y_val_pred))
-        print(f"RMSE (normalized): {rmse}")
-
-        results_df = pd.DataFrame(
-            {
-                "actual": y_val,
-                "prediction": y_val_pred,
-            },
-            index=y_val.index,
-        )
-        if use_normalization:
-            denormalized_results_df = denormalize_predictions(
-                results_df, raw_df, rolling_normalization_window_days
-            )
-        else:
-            denormalized_results_df = results_df
-
-        # Calculate RMSE for denormalized data
-        rmse = np.sqrt(
-            mean_squared_error(
-                denormalized_results_df["actual"], denormalized_results_df["prediction"]
-            )
-        )
-        print(f"RMSE: {rmse}")
-
-        # Calculate mean absolute percentage error for denormalized data
-        denormalized_results_df["PE"] = 100 * (
-            (denormalized_results_df["actual"] - denormalized_results_df["prediction"])
-            / denormalized_results_df["actual"]
-        )
-        denormalized_results_df["APE"] = np.abs(denormalized_results_df["PE"])
-        mape = denormalized_results_df["APE"].mean()
-        print(f"MAPE: {mape}%")
-
-    # one_fold_validation()
     study.optimize(objective, n_trials=100)
 
 
