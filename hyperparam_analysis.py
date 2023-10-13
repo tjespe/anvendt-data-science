@@ -80,15 +80,15 @@ if __name__ == "__main__":
     # %%
     # Show how RMSE and MAPE changes for the different parameters
     for hyperparam in [
-        "rolling_normalization_window_days",
+        # "rolling_normalization_window_days",
         # "num_splits",
         "n_estimators",
         "max_depth",
         "learning_rate",
-        "subsample",
-        "colsample_bytree",
-        "gamma",
-        "reg_lambda",
+        # "subsample",
+        # "colsample_bytree",
+        # "gamma",
+        # "reg_lambda",
     ]:
         relevant_trials = sorted(
             [
