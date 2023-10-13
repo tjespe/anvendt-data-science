@@ -55,9 +55,7 @@ if __name__ == "__main__":
         )
         use_rolling = False
         if use_normalization:
-            use_rolling = trial.suggest_categorical(
-                "use_rolling_normalization", [True, False]
-            )
+            use_rolling = False  # trial.suggest_categorical("use_rolling_normalization", [True, False])
         rolling_normalization_window_days = None
         if use_rolling:
             rolling_normalization_window_days = trial.suggest_int(
@@ -73,7 +71,6 @@ if __name__ == "__main__":
         # colsample_bytree = trial.suggest_float("colsample_bytree", 0.1, 1)
         # gamma = trial.suggest_float("gamma", 0, 1)
         # reg_lambda = trial.suggest_float("reg_lambda", 1e-8, 1.0, log=True)
-        print(json.dumps(trial.params, indent=4))
 
         # %%
         print("Preprocessing data...")
@@ -94,8 +91,11 @@ if __name__ == "__main__":
         features = list(folds[0][0][0].columns)
         features_to_use = []
         for feature in features:
-            if trial.suggest_categorical(f"use_{feature}", [True, False]):
+            if trial.suggest_int(f"use_feature_{feature}", 0, 1):
                 features_to_use.append(feature)
+        print(json.dumps(trial.params, indent=4))
+        if not features_to_use:
+            return float("inf"), float("inf")
         # %%
         cv_folds = folds[:-1]
         results_dfs = []
@@ -189,7 +189,9 @@ if __name__ == "__main__":
         return rmse, mape
 
     # %%
-    study_name = "XGBoost consumption prediction"
+    sampler = optuna.samplers.NSGAIISampler()
+    study_name = f"XGBoost consumption prediction {sampler.__class__.__name__}"
+    # %%
     try:
         study = optuna.load_study(study_name=study_name, storage="sqlite:///optuna.db")
     except KeyError as e:
@@ -197,6 +199,7 @@ if __name__ == "__main__":
             directions=["minimize", "minimize"],
             storage="sqlite:///optuna.db",
             study_name=study_name,
+            sampler=sampler,
         )
 
     def one_fold_validation():
