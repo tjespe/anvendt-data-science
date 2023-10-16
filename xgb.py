@@ -1,4 +1,5 @@
 # %%
+import datetime
 import pandas as pd
 import numpy as np
 from denormalize import denormalize_predictions
@@ -13,7 +14,6 @@ import json
 
 import warnings
 
-warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 
@@ -30,6 +30,7 @@ manually_chosen_features = {
     "temperature_4_to_6h_ago",
     "temperature_7_to_12h_ago",
     "temperature_1w_ago",
+    "temperature_prev_week",
     "temperature_prev_prev_week",
     "mean_consumption_at_hour_4d_normalized",
     "mean_consumption_at_hour_7d_normalized",
@@ -73,14 +74,12 @@ if __name__ == "__main__":
         """
         if do_feature_selection:
             use_normalization = True
-            use_rolling = False
-            rolling_normalization_window_days = None
+            use_rolling = True
+            rolling_normalization_window_days = 35
             num_splits = 10
-            n_estimators = (
-                250  # 700 was better, but we use fewer here to make it faster
-            )
-            max_depth = 8  # 12 was better
-            learning_rate = 0.1
+            n_estimators = 500
+            max_depth = 5
+            learning_rate = 0.033
         else:
             use_normalization = True  # trial.suggest_categorical("use_target_normalization", [True, False])
             use_rolling = False
@@ -91,23 +90,34 @@ if __name__ == "__main__":
             rolling_normalization_window_days = None
             if use_rolling:
                 rolling_normalization_window_days = trial.suggest_int(
-                    "rolling_normalization_window_days", 5, 100
+                    "rolling_normalization_window_days", 5, 70
                 )
             # Based on results, it seemed like num_splits is not an important hyperparam,
             # so we set it to a fixes number instead
             num_splits = 10
-            n_estimators = trial.suggest_int("n_estimators", 1, 2000, log=True)
-            max_depth = trial.suggest_int("max_depth", 1, 20, log=True)
-            learning_rate = trial.suggest_float("learning_rate", 1e-9, 1, log=True)
-            # subsample = trial.suggest_float("subsample", 0.1, 1)
-            # colsample_bytree = trial.suggest_float("colsample_bytree", 0.1, 1)
-            # gamma = trial.suggest_float("gamma", 0, 1)
-            # reg_lambda = trial.suggest_float("reg_lambda", 1e-8, 1.0, log=True)
+            n_estimators = trial.suggest_int("n_estimators", 1, 500, log=True)
+            max_depth = trial.suggest_int("max_depth", 1, 10, log=True)
+            learning_rate = trial.suggest_float("learning_rate", 1e-4, 1, log=True)
+            subsample = trial.suggest_float("subsample", 0.1, 1)
+            colsample_bytree = trial.suggest_float("colsample_bytree", 0.1, 1)
+            gamma = trial.suggest_float("gamma", 0, 1)
+            reg_lambda = trial.suggest_float("reg_lambda", 1e-8, 1.0, log=True)
 
         # %%
         print("Preprocessing data...")
         processed_df = preprocess_consumption_data(
             raw_df, rolling_normalization_window_days
+        )
+        # %%
+        # Ensure first validation day is always the same (differences in
+        # rolling_normalization_window_days parameter lead to different nan values,
+        # so the start date becomes different and the tests become uncomparable
+        fixed_start_date = datetime.date(2022, 4, 29)
+        processed_df = processed_df[processed_df["time"].dt.date >= fixed_start_date]
+        print(processed_df["time"].min())
+        assert (min_date := processed_df["time"].dt.date.min()) == fixed_start_date, (
+            f"Expected first date in processed data to be {fixed_start_date}, but"
+            f" was {min_date}"
         )
         # %%
         print("Splitting")
@@ -118,6 +128,9 @@ if __name__ == "__main__":
             if use_normalization
             else "consumption",
         )
+        # %%
+        # Skip first fold because it has too little training data
+        folds = folds[1:]
         # %%
         # Select features
         features = list(folds[0][0][0].columns)
@@ -149,10 +162,10 @@ if __name__ == "__main__":
                 max_depth=max_depth,
                 learning_rate=learning_rate,
                 n_estimators=n_estimators,
-                # subsample=subsample,
-                # colsample_bytree=colsample_bytree,
-                # gamma=gamma,
-                # reg_lambda=reg_lambda,
+                subsample=subsample,
+                colsample_bytree=colsample_bytree,
+                gamma=gamma,
+                reg_lambda=reg_lambda,
             )
             X_val = X_val[features_to_use]
             X_val = pd.get_dummies(X_val)
@@ -188,7 +201,7 @@ if __name__ == "__main__":
         rmse = np.sqrt(
             mean_squared_error(results_df["actual"], results_df["prediction"])
         )
-        print(f"RMSE: {rmse}")
+        print(f"RMSE (denormalized): {rmse}")
 
         # Calculate mean absolute percentage error for denormalized data
         results_df["PE"] = 100 * (
@@ -198,10 +211,10 @@ if __name__ == "__main__":
         mape = results_df["APE"].mean()
         print(f"MAPE: {results_df['APE'].mean()}%")
         print(
-            "MAPE per",
+            "Location stats\n",
             results_df.groupby(
                 results_df.index.get_level_values("location"), observed=True
-            )["APE"].mean(),
+            )[["APE", "PE"]].mean(),
         )
         fold_stats = (
             results_df.reset_index().groupby("fold")["time"].agg(["min", "max"])
@@ -227,8 +240,9 @@ if __name__ == "__main__":
         return rmse, mape
 
     # %%
-    sampler = optuna.samplers.NSGAIIISampler()
+    sampler = None  # optuna.samplers.NSGAIIISampler()
     study_name = f"XGBoost consumption prediction {'feature selection ' if do_feature_selection else ''}{sampler.__class__.__name__}"
+    print(study_name)
     # %%
     try:
         study = optuna.load_study(study_name=study_name, storage="sqlite:///optuna.db")

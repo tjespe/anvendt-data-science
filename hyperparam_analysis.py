@@ -1,5 +1,4 @@
 # %%
-import json
 import optuna
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -11,8 +10,9 @@ if __name__ == "__main__":
     This file analyzes the results from Optuna's hyperparameter tuning.
     """
     # %%
-    sampler = optuna.samplers.NSGAIIISampler()
-    study_name = f"XGBoost consumption prediction {sampler.__class__.__name__}"
+    sampler = None  # optuna.samplers.NSGAIIISampler()
+    include_location = False
+    study_name = f"XGBoost consumption prediction {'w/ location ' if include_location else ''}{sampler.__class__.__name__}"
     study = optuna.load_study(study_name=study_name, storage="sqlite:///optuna.db")
     filtered_trials = lambda: [
         t
@@ -60,6 +60,26 @@ if __name__ == "__main__":
     fig.show()
 
     # %%
+    # Show RMSE for different combos of n_estimators and max_depth
+    fig = optuna.visualization.plot_contour(
+        study,
+        target=lambda t: t.values[0],
+        params=["subsample", "colsample_bytree"],
+        target_name="RMSE",
+    )
+    fig.show()
+
+    # %%
+    # Show RMSE for different combos of n_estimators and max_depth
+    fig = optuna.visualization.plot_contour(
+        study,
+        target=lambda t: t.values[0],
+        params=["gamma", "reg_lambda"],
+        target_name="RMSE",
+    )
+    fig.show()
+
+    # %%
     # Show how RMSE changes for different rolling_normalization_window_days
     relevant_trials = sorted(
         [
@@ -82,13 +102,13 @@ if __name__ == "__main__":
     for hyperparam in [
         # "rolling_normalization_window_days",
         # "num_splits",
-        "n_estimators",
-        "max_depth",
-        "learning_rate",
-        # "subsample",
-        # "colsample_bytree",
-        # "gamma",
-        # "reg_lambda",
+        # "n_estimators",
+        # "max_depth",
+        # "learning_rate",
+        "subsample",
+        "colsample_bytree",
+        "gamma",
+        "reg_lambda",
     ]:
         relevant_trials = sorted(
             [
@@ -157,19 +177,19 @@ if __name__ == "__main__":
         t_stat_rmse, p_value_rmse = stats.ttest_ind(
             rmse_no_rolling, rmse_rolling, equal_var=False, alternative="greater"
         )
-        print("p-value:", p_value_rmse)
+        print("p-value that rolling is best:", p_value_rmse)
 
     print()
     for metric in ["RMSE", "MAPE"]:
         print(f"Mean {metric} when using normalization vs. no normalization")
-        print(df.groupby("use_normalization")[metric].agg("mean"))
         grouped = df.groupby("use_normalization")[metric]
-        rmse_no_rolling = grouped.get_group(False)
-        rmse_rolling = grouped.get_group(True)
+        print(grouped.agg("mean"))
+        rmse_no_norming = grouped.get_group(False)
+        rmse_norming = grouped.get_group(True)
         t_stat_rmse, p_value_rmse = stats.ttest_ind(
-            rmse_no_rolling, rmse_rolling, equal_var=False, alternative="greater"
+            rmse_no_norming, rmse_norming, equal_var=False, alternative="greater"
         )
-        print("p-value:", p_value_rmse)
+        print("p-value that norming is best:", p_value_rmse)
 
     # %%
     # Show hyperparameter importance for RMSE
