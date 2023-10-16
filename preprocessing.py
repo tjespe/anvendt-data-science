@@ -131,21 +131,30 @@ def preprocess_consumption_data(df: pd.DataFrame, rolling_normalization_window_d
     ) / cumulative_stats["std"]
 
     # %%
-    # Remove original consumption column
-    df = df.drop(columns=["consumption"])
-
-    # %%
     # Generate consumption features
     for lookback in [4, 7, 14]:
-        df[f"mean_consumption_{lookback}d"] = df.groupby(
+        df[f"mean_consumption_at_hour_{lookback}d"] = df.groupby(
             ["hour", "location"], observed=True
-        )["consumption_normalized"].transform(
-            lambda x: x.shift(5).rolling(lookback).mean()
-        )
+        )["consumption"].transform(lambda x: x.shift(5).rolling(lookback).mean())
+        df[f"mean_consumption_at_hour_{lookback}d_normalized"] = (
+            df[f"mean_consumption_at_hour_{lookback}d"] - cumulative_stats["mean"]
+        ) / cumulative_stats["std"]
+        df[f"mean_consumption_{lookback}d"] = df.groupby("location", observed=True)[
+            "consumption"
+        ].transform(lambda x: x.shift(5 * 24).rolling(lookback).mean())
+        df[f"mean_consumption_{lookback}d_normalized"] = (
+            df[f"mean_consumption_{lookback}d"] - cumulative_stats["mean"]
+        ) / cumulative_stats["std"]
 
     df["consumption_1w_ago"] = df.groupby(
         ["location", "weekday", "hour"], observed=True
-    )["consumption_normalized"].transform(lambda x: x.shift(1))
+    )["consumption"].transform(lambda x: x.shift(1))
+    df["consumption_1w_ago_normalized"] = (
+        df.groupby(["location", "weekday", "hour"], observed=True)[
+            "consumption"
+        ].transform(lambda x: x.shift(1))
+        - cumulative_stats["mean"]
+    ) / cumulative_stats["std"]
 
     # Extract the temperature features
     df["temperature_1h_ago"] = df.groupby("location", observed=True)[
@@ -166,6 +175,24 @@ def preprocess_consumption_data(df: pd.DataFrame, rolling_normalization_window_d
     df["temperature_13_to_24h_ago"] = df.groupby("location", observed=True)[
         "temperature"
     ].transform(lambda x: x.shift(13).rolling(12).mean())
+    df["temperature_prev_week"] = df.groupby("location", observed=True)[
+        "temperature"
+    ].transform(lambda x: x.shift(25).rolling(6 * 24).mean())
+    df["temperature_1w_ago"] = df.groupby(
+        ["location", "hour", "weekday"], observed=True
+    )["temperature"].transform(lambda x: x.shift(1))
+    df["temperature_prev_prev_week"] = df.groupby("location", observed=True)[
+        "temperature"
+    ].transform(lambda x: x.shift(6 * 24 + 25).rolling(7 * 24).mean())
+    df["temperature_2w_ago"] = df.groupby(
+        ["location", "hour", "weekday"], observed=True
+    )["temperature"].transform(lambda x: x.shift(2))
+    df["temperature_prev_prev_prev_week"] = df.groupby("location", observed=True)[
+        "temperature"
+    ].transform(lambda x: x.shift(13 * 24 + 25).rolling(7 * 24).mean())
+    df["temperature_3w_ago"] = df.groupby(
+        ["location", "hour", "weekday"], observed=True
+    )["temperature"].transform(lambda x: x.shift(3))
 
     # Some rows have NaN because of the lookback features, but since there are so few,
     # we drop them

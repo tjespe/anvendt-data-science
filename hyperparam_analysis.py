@@ -1,4 +1,5 @@
 # %%
+import json
 import optuna
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -10,8 +11,14 @@ if __name__ == "__main__":
     This file analyzes the results from Optuna's hyperparameter tuning.
     """
     # %%
-    study_name = "XGBoost consumption prediction"
+    sampler = optuna.samplers.NSGAIIISampler()
+    study_name = f"XGBoost consumption prediction {sampler.__class__.__name__}"
     study = optuna.load_study(study_name=study_name, storage="sqlite:///optuna.db")
+    filtered_trials = lambda: [
+        t
+        for t in study.trials
+        if t.state == optuna.trial.TrialState.COMPLETE and t.values
+    ]
 
     # %%
     # Plot Pareto front of the two objective values
@@ -19,6 +26,26 @@ if __name__ == "__main__":
         study,
         targets=lambda t: (t.values[0], t.values[1]),
         target_names=["RMSE", "MAPE"],
+    )
+    fig.show()
+
+    # %%
+    # Show RMSE for different combos of learning_rate and max_depth
+    fig = optuna.visualization.plot_contour(
+        study,
+        target=lambda t: t.values[0],
+        params=["learning_rate", "max_depth"],
+        target_name="RMSE",
+    )
+    fig.show()
+
+    # %%
+    # Show MAPE for different combos of learning_rate and max_depth
+    fig = optuna.visualization.plot_contour(
+        study,
+        target=lambda t: t.values[1],
+        params=["learning_rate", "max_depth"],
+        target_name="MAPE",
     )
     fig.show()
 
@@ -33,22 +60,12 @@ if __name__ == "__main__":
     fig.show()
 
     # %%
-    # Show MAPE for different combos of n_estimators and max_depth
-    fig = optuna.visualization.plot_contour(
-        study,
-        target=lambda t: t.values[1],
-        params=["n_estimators", "max_depth"],
-        target_name="MAPE",
-    )
-    fig.show()
-
-    # %%
     # Show how RMSE changes for different rolling_normalization_window_days
     relevant_trials = sorted(
         [
             trial
-            for trial in study.trials
-            if "rolling_normalization_window_days" in trial.params and trial.values
+            for trial in filtered_trials()
+            if "rolling_normalization_window_days" in trial.params
         ],
         key=lambda trial: trial.params["rolling_normalization_window_days"],
     )
@@ -63,16 +80,20 @@ if __name__ == "__main__":
     # %%
     # Show how RMSE and MAPE changes for the different parameters
     for hyperparam in [
-        "rolling_normalization_window_days",
-        "num_splits",
+        # "rolling_normalization_window_days",
+        # "num_splits",
         "n_estimators",
         "max_depth",
         "learning_rate",
+        # "subsample",
+        # "colsample_bytree",
+        # "gamma",
+        # "reg_lambda",
     ]:
         relevant_trials = sorted(
             [
                 trial
-                for trial in study.trials
+                for trial in filtered_trials()
                 if trial.values and hyperparam in trial.params
             ],
             key=lambda trial: trial.params[hyperparam],
@@ -111,34 +132,44 @@ if __name__ == "__main__":
     df = pd.DataFrame(
         [
             (
-                trial.params["use_rolling_normalization"],
+                trial.params.get("use_target_normalization", True),
+                trial.params.get("use_rolling_normalization", None),
                 trial.values[0],
                 trial.values[1],
             )
-            for trial in study.trials
+            for trial in filtered_trials()
             if trial.values
         ],
-        columns=["use_rolling_normalization", "RMSE", "MAPE"],
+        columns=["use_normalization", "use_rolling_normalization", "RMSE", "MAPE"],
     )
-    print("Mean RMSE when using rolling window normalization vs. expanding")
-    print(df.groupby("use_rolling_normalization")["RMSE"].agg("mean"))
-    grouped = df.groupby("use_rolling_normalization")["RMSE"]
-    rmse_no_rolling = grouped.get_group(False)
-    rmse_rolling = grouped.get_group(True)
-    t_stat_rmse, p_value_rmse = stats.ttest_ind(
-        rmse_no_rolling, rmse_rolling, equal_var=False, alternative="less"
-    )
-    print("p-value:", p_value_rmse)
+    for metric in ["RMSE", "MAPE"]:
+        print(f"Mean {metric} when using rolling window normalization vs. expanding")
+        print(
+            df[df["use_normalization"] == True]
+            .groupby("use_rolling_normalization")[metric]
+            .agg("mean")
+        )
+        grouped = df[df["use_normalization"] == True].groupby(
+            "use_rolling_normalization"
+        )[metric]
+        rmse_no_rolling = grouped.get_group(False)
+        rmse_rolling = grouped.get_group(True)
+        t_stat_rmse, p_value_rmse = stats.ttest_ind(
+            rmse_no_rolling, rmse_rolling, equal_var=False, alternative="greater"
+        )
+        print("p-value:", p_value_rmse)
 
-    print("\nMean MAPE when using rolling window normalization vs. expanding")
-    print(df.groupby("use_rolling_normalization")["MAPE"].agg("mean"))
-    grouped = df.groupby("use_rolling_normalization")["MAPE"]
-    mape_no_rolling = grouped.get_group(False)
-    mape_rolling = grouped.get_group(True)
-    t_stat_mape, p_value_mape = stats.ttest_ind(
-        mape_no_rolling, mape_rolling, equal_var=False, alternative="less"
-    )
-    print("p-value:", p_value_mape)
+    print()
+    for metric in ["RMSE", "MAPE"]:
+        print(f"Mean {metric} when using normalization vs. no normalization")
+        print(df.groupby("use_normalization")[metric].agg("mean"))
+        grouped = df.groupby("use_normalization")[metric]
+        rmse_no_rolling = grouped.get_group(False)
+        rmse_rolling = grouped.get_group(True)
+        t_stat_rmse, p_value_rmse = stats.ttest_ind(
+            rmse_no_rolling, rmse_rolling, equal_var=False, alternative="greater"
+        )
+        print("p-value:", p_value_rmse)
 
     # %%
     # Show hyperparameter importance for RMSE
