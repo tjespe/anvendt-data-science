@@ -15,37 +15,37 @@ from xgb import predict_xgb
 
 # %%
 use_normalization = True  # Tested to be good, p-value < 0.01
-use_rolling = False  # Tested to be bad, p-value < 0.01
-rolling_normalization_window_days = None  # Tested to be bad, p-value < 0.01
+use_rolling = True  # Tested to be bad, p-value < 0.01
+rolling_normalization_window_days = 35  # Tested to be bad, p-value < 0.01
 num_splits = 10  # Tested to be inconsequential, set to 10 for practical purposes
-n_estimators = 600  # Did not seem to matter much, set to default
-max_depth = 8  # Around 10 was good
-learning_rate = 0.25  # Good values ranged from 0.02 to 1 in the cross-validation
-# subsample = trial.suggest_float("subsample", 0.1, 1)
-# colsample_bytree = trial.suggest_float("colsample_bytree", 0.1, 1)
-# gamma = trial.suggest_float("gamma", 0, 1)
-# reg_lambda = trial.suggest_float("reg_lambda", 1e-8, 1.0, log=True)
+n_estimators = 500
+max_depth = 5
+learning_rate = 0.033
+subsample = 0.15
+colsample_bytree = 0.50
+gamma = 0.07
+reg_lambda = 0.3
 
 # %%
 features_to_use = [
-    "mean_consumption_14d",
-    "temperature_7_to_12h_ago",
-    "mean_consumption_at_hour_4d_normalized",
-    "mean_consumption_at_hour_7d",
-    "location",
     "consumption_1w_ago_normalized",
-    "temperature_1h_ago",
-    "holiday",
-    "mean_consumption_at_hour_7d_normalized",
-    "mean_consumption_4d_normalized",
-    "mean_consumption_at_hour_14d",
-    "season",
+    "temperature",
     "temperature_4_to_6h_ago",
+    "temperature_7_to_12h_ago",
+    "temperature_1w_ago",
+    "temperature_prev_week",
+    "temperature_prev_prev_week",
+    "mean_consumption_at_hour_4d_normalized",
+    "mean_consumption_at_hour_7d_normalized",
 ]
 
 
 # %%
 raw_df = read_consumption_data()
+
+# %%
+# Remove Helsingfors
+raw_df = raw_df[raw_df["location"] != "helsingfors"]
 
 # %%
 print("Preprocessing data...")
@@ -57,6 +57,11 @@ folds = split_into_cv_folds_and_test_fold(
     n_splits=num_splits,
     target_variable="consumption_normalized" if use_normalization else "consumption",
 )
+# %%
+# Skip first fold because it has too little training data
+folds = folds[1:]
+# %%
+# Do cross validation
 cv_folds = folds[:-1]
 results_dfs = []
 for i, (training, validation) in enumerate(cv_folds):
@@ -113,23 +118,23 @@ results_df["PE"] = 100 * (
     (results_df["actual"] - results_df["prediction"]) / results_df["actual"]
 )
 results_df["APE"] = np.abs(results_df["PE"])
-mape = results_df["APE"].mean()
-print(f"MAPE: {results_df['APE'].mean()}%")
-print(
-    "MAPE per",
-    results_df.groupby(results_df.index.get_level_values("location"), observed=True)[
-        "APE"
-    ].mean(),
-)
-print("MAPE per fold", results_df.groupby("fold")["APE"].mean())
-print("\nMPE per fold", results_df.groupby("fold")["PE"].mean())
 
 # %%
-# Print info about the fold
+mape = results_df["APE"].mean()
+print(f"MAPE: {mape}%")
 print(
-    "Fold time info:\n",
-    results_df.reset_index().groupby("fold")["time"].agg(["min", "max"]),
+    "Location stats\n",
+    results_df.groupby(results_df.index.get_level_values("location"), observed=True)[
+        ["APE", "PE"]
+    ].mean(),
 )
+fold_stats = results_df.reset_index().groupby("fold")["time"].agg(["min", "max"])
+fold_stats.columns = ["From", "To"]
+fold_stats["MAPE"] = results_df.groupby("fold")["APE"].mean()
+fold_stats["MPE"] = results_df.groupby("fold")["PE"].mean()
+fold_stats.From = fold_stats.From.dt.strftime("%d. %b")
+fold_stats.To = fold_stats.To.dt.strftime("%d. %b")
+print(fold_stats)
 
 # %%
 results_df = results_df.reset_index()
@@ -139,16 +144,6 @@ dates = results_df["date"].unique()
 weeks = results_df["week"].unique()
 locations = results_df["location"].unique()
 results_df = results_df.set_index(["time", "location"])
-
-# %%
-# Look at performance in Oslo
-for date in dates:
-    values_on_date = results_df.reset_index().loc[
-        pd.Series(results_df.index.get_level_values("time")).dt.date == date
-    ]
-    values_on_date[values_on_date["location"] == "oslo"].set_index("time")[
-        ["actual", "prediction"]
-    ].plot()
 
 # %%
 # Loop through each week and create a separate line graph
@@ -177,8 +172,8 @@ for week in weeks:
             label="Predicted",
         )
 
-        # Use HH:MM format for the x-axis
-        plt.gca().xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%H:%M"))
+        # Set format for the x-axis
+        plt.gca().xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%a %H:%M"))
 
         # Customize the plot
         plt.title(
@@ -202,7 +197,6 @@ for week in weeks:
 
 # %%
 # Plot feature importance
-fig, ax = plt.subplots(figsize=(15, 30))
-xgboost.plot_importance(model, ax=ax)
+xgboost.plot_importance(model)
 
 # %%

@@ -1,0 +1,19 @@
+Location stats w/o Helsinki
+               MAPE       MPE
+location                     
+bergen     7.820954  2.316616
+oslo       8.409373  0.761333
+stavanger  7.881323  0.582246
+tromsø     8.004918  0.094932
+trondheim  7.146176  1.653081
+
+
+Location stats w/ Helsinki
+                  MAPE       MPE
+location
+bergen        9.160127  1.117060
+helsingfors   6.685241 -4.297398
+oslo          8.492330 -0.230144
+stavanger     8.360577 -0.262131
+tromsø       10.263034 -1.568608
+trondheim     7.548206  0.563484
