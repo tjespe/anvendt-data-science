@@ -14,10 +14,10 @@ from xgb import predict_xgb
 
 
 # %%
-use_normalization = True  # Tested to be good, p-value < 0.01
-use_rolling = True  # Tested to be bad, p-value < 0.01
-rolling_normalization_window_days = 35  # Tested to be bad, p-value < 0.01
-num_splits = 10  # Tested to be inconsequential, set to 10 for practical purposes
+use_normalization = True
+use_rolling = True
+rolling_normalization_window_days = 35
+num_splits = 10
 n_estimators = 500
 max_depth = 5
 learning_rate = 0.033
