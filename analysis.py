@@ -109,29 +109,51 @@ for i, (training, validation) in enumerate(cv_folds):
 results_df = pd.concat(results_dfs)
 
 # %%
+# Add baseline prediction (equal to the actual value for the same hour and same location the previous week)
+baseline_df = processed_df[["consumption", "location", "hour", "time"]].copy()
+baseline_df["baseline"] = (
+    baseline_df.sort_values(by="time")
+    .groupby(["location", "hour"])["consumption"]
+    .shift(1)
+)
+baseline_df = baseline_df.set_index(["time", "location"])
+results_df = results_df.join(baseline_df["baseline"])
+
+# %%
 # Calculate RMSE for denormalized data
 rmse = np.sqrt(mean_squared_error(results_df["actual"], results_df["prediction"]))
 print(f"RMSE: {rmse}")
+rmse_baseline = np.sqrt(
+    mean_squared_error(results_df["actual"], results_df["baseline"])
+)
+print(f"RMSE (baseline): {rmse_baseline}")
 
 # Calculate mean absolute percentage error for denormalized data
 results_df["PE"] = 100 * (
     (results_df["actual"] - results_df["prediction"]) / results_df["actual"]
 )
 results_df["APE"] = np.abs(results_df["PE"])
+results_df["PE_baseline"] = 100 * (
+    (results_df["actual"] - results_df["baseline"]) / results_df["actual"]
+)
+results_df["APE_baseline"] = np.abs(results_df["PE_baseline"])
 
 # %%
 mape = results_df["APE"].mean()
 print(f"MAPE: {mape}%")
+print(f"MAPE (baseline): {results_df['APE_baseline'].mean()}%")
 print(
     "Location stats\n",
     results_df.groupby(results_df.index.get_level_values("location"), observed=True)[
-        ["APE", "PE"]
+        ["APE", "PE", "APE_baseline", "PE_baseline"]
     ].mean(),
 )
 fold_stats = results_df.reset_index().groupby("fold")["time"].agg(["min", "max"])
 fold_stats.columns = ["From", "To"]
 fold_stats["MAPE"] = results_df.groupby("fold")["APE"].mean()
 fold_stats["MPE"] = results_df.groupby("fold")["PE"].mean()
+fold_stats["MAPE_baseline"] = results_df.groupby("fold")["APE_baseline"].mean()
+fold_stats["MPE_baseline"] = results_df.groupby("fold")["PE_baseline"].mean()
 fold_stats.From = fold_stats.From.dt.strftime("%d. %b")
 fold_stats.To = fold_stats.To.dt.strftime("%d. %b")
 print(fold_stats)
@@ -200,3 +222,136 @@ for week in weeks:
 xgboost.plot_importance(model)
 
 # %%
+# Test on the test fold
+test_fold = folds[-1]
+X_train, y_train = test_fold[0]
+X_test, y_test = test_fold[1]
+X_train = X_train[features_to_use]
+X_train = pd.get_dummies(X_train)
+model = train_xgb(
+    X_train,
+    y_train,
+    max_depth=max_depth,
+    learning_rate=learning_rate,
+    n_estimators=n_estimators,
+    subsample=subsample,
+    colsample_bytree=colsample_bytree,
+    gamma=gamma,
+    reg_lambda=reg_lambda,
+)
+X_test = X_test[features_to_use]
+X_test = pd.get_dummies(X_test)
+X_test = X_test.reindex(columns=X_train.columns, fill_value=0)[X_train.columns]
+y_test_pred = predict_xgb(model, X_test)
+rmse = np.sqrt(mean_squared_error(y_test, y_test_pred))
+print(f"RMSE (normalized): {rmse}")
+test_results_df = pd.DataFrame(
+    {
+        "actual": y_test,
+        "prediction": y_test_pred,
+    },
+    index=y_test.index,
+)
+if use_normalization:
+    results_df = denormalize_predictions(
+        test_results_df, raw_df, rolling_normalization_window_days
+    )
+else:
+    results_df = test_results_df
+
+# %%
+# Add baseline prediction (equal to the actual value for the same hour and same location the previous week)
+results_df = results_df.join(baseline_df["baseline"])
+
+# %%
+# Calculate RMSE for denormalized data
+rmse = np.sqrt(mean_squared_error(results_df["actual"], results_df["prediction"]))
+print(f"RMSE: {rmse}")
+rmse_baseline = np.sqrt(
+    mean_squared_error(results_df["actual"], results_df["baseline"])
+)
+print(f"RMSE (baseline): {rmse_baseline}")
+
+# Calculate mean absolute percentage error for denormalized data
+results_df["PE"] = 100 * (
+    (results_df["actual"] - results_df["prediction"]) / results_df["actual"]
+)
+results_df["APE"] = np.abs(results_df["PE"])
+results_df["PE_baseline"] = 100 * (
+    (results_df["actual"] - results_df["baseline"]) / results_df["actual"]
+)
+results_df["APE_baseline"] = np.abs(results_df["PE_baseline"])
+
+# %%
+mape = results_df["APE"].mean()
+print(f"MAPE: {mape}%")
+print(f"MAPE (baseline): {results_df['APE_baseline'].mean()}%")
+print(
+    "Location stats\n",
+    results_df.groupby(results_df.index.get_level_values("location"), observed=True)[
+        ["APE", "PE", "APE_baseline", "PE_baseline"]
+    ].mean(),
+)
+
+# %%
+results_df = results_df.reset_index()
+results_df["date"] = results_df["time"].dt.date
+results_df["week"] = results_df["time"].dt.strftime("%W")
+dates = results_df["date"].unique()
+weeks = results_df["week"].unique()
+locations = results_df["location"].unique()
+results_df = results_df.set_index(["time", "location"])
+
+# %%
+# Loop through each week and create a separate line graph
+for week in weeks:
+    for location in locations:
+        # Filter data for the current week
+        subset = results_df[
+            (results_df["week"] == week)
+            & (results_df.index.get_level_values("location") == location)
+        ]
+
+        # Skip if subset is empty
+        if subset.empty:
+            continue
+
+        # Create a new figure and plot the data
+        plt.figure(figsize=(12, 6))
+        plt.plot(
+            subset.index.get_level_values("time"),
+            subset["actual"],
+            label="Actual",
+        )
+        plt.plot(
+            subset.index.get_level_values("time"),
+            subset["prediction"],
+            label="Predicted",
+        )
+
+        # Set format for the x-axis
+        plt.gca().xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%a %H:%M"))
+
+        # Customize the plot
+        plt.title(
+            f"Week {week} - Actual vs. Predicted Consumption in {location[0].upper()+location[1:]}"
+        )
+        plt.xlabel("Hour of Day")
+        plt.ylabel("Consumption (avg. MW in hour)")
+        plt.legend()
+
+        # Start y-axis at 0
+        plt.ylim(bottom=0)
+
+        # Set top of y-axis to 1.5 times the maximum value
+        plt.ylim(top=1.5 * max(subset["actual"].max(), subset["prediction"].max()))
+
+        # Display the plot or save it as an image
+        plt.grid(True)
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        plt.show()
+
+# %%
+# Plot feature importance
+xgboost.plot_importance(model)
