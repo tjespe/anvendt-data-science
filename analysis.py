@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error
 import xgboost
 from denormalize import denormalize_predictions
+import seaborn as sns
 
 from preprocessing import preprocess_consumption_data, read_consumption_data
 from train_test_split import split_into_cv_folds_and_test_fold
@@ -76,10 +77,10 @@ for i, (training, validation) in enumerate(cv_folds):
         max_depth=max_depth,
         learning_rate=learning_rate,
         n_estimators=n_estimators,
-        # subsample=subsample,
-        # colsample_bytree=colsample_bytree,
-        # gamma=gamma,
-        # reg_lambda=reg_lambda,
+        subsample=subsample,
+        colsample_bytree=colsample_bytree,
+        gamma=gamma,
+        reg_lambda=reg_lambda,
     )
     X_val = X_val[features_to_use]
     X_val = pd.get_dummies(X_val)
@@ -260,8 +261,39 @@ else:
     results_df = test_results_df
 
 # %%
+# Test a model trained on raw_df
+raw_folds = split_into_cv_folds_and_test_fold(
+    raw_df,
+    n_splits=num_splits,
+    target_variable="consumption",
+)
+raw_test_fold = raw_folds[-1]
+raw_X_train, raw_y_train = raw_test_fold[0]
+raw_X_train = pd.get_dummies(raw_X_train)
+raw_X_test, raw_y_test = raw_test_fold[1]
+model = train_xgb(
+    raw_X_train,
+    raw_y_train,
+)
+raw_X_test = pd.get_dummies(raw_X_test)
+raw_y_test_pred = predict_xgb(model, raw_X_test)
+rmse = np.sqrt(mean_squared_error(raw_y_test, raw_y_test_pred))
+print(f"RMSE (raw): {rmse}")
+test_results_df = pd.DataFrame(
+    {
+        "actual": raw_y_test,
+        "raw_prediction": raw_y_test_pred,
+    },
+    index=raw_y_test.index,
+)
+
+# %%
 # Add baseline prediction (equal to the actual value for the same hour and same location the previous week)
 results_df = results_df.join(baseline_df["baseline"])
+
+# %%
+# Add raw prediction
+results_df = results_df.join(test_results_df["raw_prediction"])
 
 # %%
 # Calculate RMSE for denormalized data
@@ -271,6 +303,10 @@ rmse_baseline = np.sqrt(
     mean_squared_error(results_df["actual"], results_df["baseline"])
 )
 print(f"RMSE (baseline): {rmse_baseline}")
+rmse_raw = np.sqrt(
+    mean_squared_error(results_df["actual"], results_df["raw_prediction"])
+)
+print(f"RMSE (raw): {rmse_raw}")
 
 # Calculate mean absolute percentage error for denormalized data
 results_df["PE"] = 100 * (
@@ -281,15 +317,20 @@ results_df["PE_baseline"] = 100 * (
     (results_df["actual"] - results_df["baseline"]) / results_df["actual"]
 )
 results_df["APE_baseline"] = np.abs(results_df["PE_baseline"])
+results_df["PE_raw"] = 100 * (
+    (results_df["actual"] - results_df["raw_prediction"]) / results_df["actual"]
+)
+results_df["APE_raw"] = np.abs(results_df["PE_raw"])
 
 # %%
 mape = results_df["APE"].mean()
 print(f"MAPE: {mape}%")
 print(f"MAPE (baseline): {results_df['APE_baseline'].mean()}%")
+print(f"MAPE (raw): {results_df['APE_raw'].mean()}%")
 print(
     "Location stats\n",
     results_df.groupby(results_df.index.get_level_values("location"), observed=True)[
-        ["APE", "PE", "APE_baseline", "PE_baseline"]
+        ["APE", "PE", "APE_baseline", "PE_baseline", "APE_raw", "PE_raw"]
     ].mean(),
 )
 
@@ -351,7 +392,18 @@ for week in weeks:
         plt.xticks(rotation=45)
         plt.tight_layout()
         plt.show()
+        plt.savefig(f"analysis/Test data predictions/week_{week}_{location}.png")
 
 # %%
 # Plot feature importance
 xgboost.plot_importance(model)
+
+# %%
+# Plot correlation between features
+all_data = pd.concat([X_train, X_test])
+all_target = pd.concat([y_train, y_test])
+all_data["consumption"] = all_target
+corr = all_data.corr()
+plt.figure(figsize=(12, 12))
+sns.heatmap(corr, annot=True, cmap=plt.cm.Reds)
+plt.show()

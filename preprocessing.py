@@ -64,6 +64,9 @@ def preprocess_consumption_data(df: pd.DataFrame, rolling_normalization_window_d
             For test, we only use training, validation, and test data points when calculating the mean.
         - mean_consumption_14d: float, the mean (normalized) consumption at that hour last 14 days (same system as 7d)
         - consumption_1w_ago: float, the consumption (normalized) at the same hour 1 week ago.
+        - mean_consumption_at_hour_4d: float, the mean (normalized) consumption at that hour last 4 days
+        - mean_consumption_at_hour_7d: float, the mean (normalized) consumption at that hour last 7 days
+        - mean_consumption_at_hour_14d: float, the mean (normalized) consumption at that hour last 14 days
         ### Temperature-based:
         - temperature: float, avg. forecasted temperature in the hour
         - temperature_1h_ago: float, avg. forecasted temperature in the hour 1 hour ago
@@ -72,6 +75,12 @@ def preprocess_consumption_data(df: pd.DataFrame, rolling_normalization_window_d
         - temperature_4_to_6h_ago: float, avg. forecasted temperature in the hours 4-6 hours ago
         - temperature_7_to_12h_ago: float, avg. forecasted temperature in the hours 7-12 hours ago
         - temperature_13_to_24h_ago: float, avg. forecasted temperature in the hours 13-24 hours ago
+        - temperature_prev_week: float, avg. forecasted temperature in the hour 1 week ago
+        - temperature_1w_ago: float, avg. forecasted temperature in the hour 1 week ago
+        - temperature_prev_prev_week: float, avg. forecasted temperature in the hour 2 weeks ago
+        - temperature_2w_ago: float, avg. forecasted temperature in the hour 2 weeks ago
+        - temperature_prev_prev_prev_week: float, avg. forecasted temperature in the hour 3 weeks ago
+        - temperature_3w_ago: float, avg. forecasted temperature in the hour 3 weeks ago
     """
     # %%
 

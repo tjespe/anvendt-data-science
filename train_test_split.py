@@ -54,11 +54,15 @@ def split_into_cv_folds_and_test_fold(
         folds.append(
             (
                 (
-                    df.iloc[training_indices].drop(columns=target_variables),
+                    df.iloc[training_indices].drop(
+                        columns=target_variables, errors="ignore"
+                    ),
                     df.iloc[training_indices][target_variable],
                 ),
                 (
-                    df.iloc[test_indices].drop(columns=target_variables),
+                    df.iloc[test_indices].drop(
+                        columns=target_variables, errors="ignore"
+                    ),
                     df.iloc[test_indices][target_variable],
                 ),
             )
