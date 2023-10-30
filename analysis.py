@@ -391,8 +391,51 @@ for week in weeks:
         plt.grid(True)
         plt.xticks(rotation=45)
         plt.tight_layout()
-        plt.show()
         plt.savefig(f"analysis/Test data predictions/week_{week}_{location}.png")
+        plt.show()
+
+# %%
+# Create one line graph for entire period in each location
+for location in locations:
+    # Filter data for the current week
+    subset = results_df[results_df.index.get_level_values("location") == location]
+
+    # Skip if subset is empty
+    if subset.empty:
+        continue
+
+    # Create a new figure and plot the data
+    plt.figure(figsize=(12, 6))
+    plt.plot(
+        subset.index.get_level_values("time"),
+        subset["actual"],
+        label="Actual",
+    )
+    plt.plot(
+        subset.index.get_level_values("time"),
+        subset["prediction"],
+        label="Predicted",
+    )
+
+    # Customize the plot
+    plt.title(
+        f"Actual vs. Predicted Consumption in {location[0].upper()+location[1:]} (Test Data)"
+    )
+    plt.ylabel("Consumption (avg. MW in hour)")
+    plt.legend()
+
+    # Start y-axis at 0
+    plt.ylim(bottom=0)
+
+    # Set top of y-axis to 1.5 times the maximum value
+    plt.ylim(top=1.5 * max(subset["actual"].max(), subset["prediction"].max()))
+
+    # Display the plot or save it as an image
+    plt.grid(True)
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.savefig(f"analysis/Test data predictions/{location}.png")
+    plt.show()
 
 # %%
 # Plot feature importance
@@ -406,4 +449,7 @@ all_data["consumption"] = all_target
 corr = all_data.corr()
 plt.figure(figsize=(12, 12))
 sns.heatmap(corr, annot=True, cmap=plt.cm.Reds)
+plt.savefig("analysis/correlation.png")
 plt.show()
+
+# %%
