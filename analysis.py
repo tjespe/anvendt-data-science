@@ -111,10 +111,12 @@ results_df = pd.concat(results_dfs)
 
 # %%
 # Add baseline prediction (equal to the actual value for the same hour and same location the previous week)
-baseline_df = processed_df[["consumption", "location", "hour", "time"]].copy()
+baseline_df = processed_df[
+    ["consumption", "location", "hour", "time", "weekday"]
+].copy()
 baseline_df["baseline"] = (
     baseline_df.sort_values(by="time")
-    .groupby(["location", "hour"])["consumption"]
+    .groupby(["location", "hour", "weekday"])["consumption"]
     .shift(1)
 )
 baseline_df = baseline_df.set_index(["time", "location"])
@@ -229,6 +231,14 @@ X_train, y_train = test_fold[0]
 X_test, y_test = test_fold[1]
 X_train = X_train[features_to_use]
 X_train = pd.get_dummies(X_train)
+
+# Exclude the last 5 days of training data, to account for the 5 day data lag in real
+# world predictions
+first_date_test = X_test.index.get_level_values("time").min()
+last_allowed_date_train = first_date_test - pd.Timedelta(days=5)
+X_train = X_train[X_train.index.get_level_values("time") <= last_allowed_date_train]
+y_train = y_train[y_train.index.get_level_values("time") <= last_allowed_date_train]
+
 model = train_xgb(
     X_train,
     y_train,
@@ -271,6 +281,8 @@ raw_test_fold = raw_folds[-1]
 raw_X_train, raw_y_train = raw_test_fold[0]
 raw_X_train = pd.get_dummies(raw_X_train)
 raw_X_test, raw_y_test = raw_test_fold[1]
+raw_X_train = raw_X_train[: -5 * 24]
+raw_y_train = raw_y_train[: -5 * 24]
 model = train_xgb(
     raw_X_train,
     raw_y_train,
