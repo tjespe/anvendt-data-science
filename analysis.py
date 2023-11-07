@@ -283,12 +283,12 @@ raw_X_train = pd.get_dummies(raw_X_train)
 raw_X_test, raw_y_test = raw_test_fold[1]
 raw_X_train = raw_X_train[: -5 * 24]
 raw_y_train = raw_y_train[: -5 * 24]
-model = train_xgb(
+raw_model = train_xgb(
     raw_X_train,
     raw_y_train,
 )
 raw_X_test = pd.get_dummies(raw_X_test)
-raw_y_test_pred = predict_xgb(model, raw_X_test)
+raw_y_test_pred = predict_xgb(raw_model, raw_X_test)
 rmse = np.sqrt(mean_squared_error(raw_y_test, raw_y_test_pred))
 print(f"RMSE (raw): {rmse}")
 test_results_df = pd.DataFrame(
