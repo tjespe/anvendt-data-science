@@ -224,7 +224,7 @@ for week in weeks:
 # Plot feature importance
 xgboost.plot_importance(model)
 
-# %%
+    # %%
 # Test on the test fold
 test_fold = folds[-1]
 X_train, y_train = test_fold[0]
