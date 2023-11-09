@@ -208,6 +208,9 @@ for week in weeks:
             label="Predicted",
         )
 
+        # Use whitegrid style
+        sns.set_style("whitegrid")
+
         # Set format for the x-axis
         plt.gca().xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%a %H:%M"))
 
@@ -233,6 +236,7 @@ for week in weeks:
 
 # %%
 # Plot feature importance with correct colors
+sns.set_style("whitegrid")
 xgboost.plot_importance(model, color=colors[0])
 
 # %%
@@ -406,6 +410,9 @@ for week in weeks:
         plt.ylabel("Consumption (avg. MW in hour)")
         plt.legend()
 
+        # Use whitegrid style
+        sns.set_style("whitegrid")
+
         # Start y-axis at 0
         plt.ylim(bottom=0)
 
@@ -451,6 +458,9 @@ for location in locations:
     plt.ylabel("Consumption (avg. MW in hour)")
     plt.legend()
 
+    # Use whitegrid style
+    sns.set_style("whitegrid")
+
     # Start y-axis at 0
     plt.ylim(bottom=0)
 
@@ -468,6 +478,8 @@ for location in locations:
 # Plot feature importance of size 10x10
 fig, ax = plt.subplots(figsize=(10, 7))
 xgboost.plot_importance(model, ax=ax, color=colors[0])
+# Use whitegrid style
+sns.set_style("whitegrid")
 # Save figure
 plt.tight_layout()
 plt.savefig("analysis/importance.png")
