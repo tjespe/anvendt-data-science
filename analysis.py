@@ -40,6 +40,15 @@ features_to_use = [
     "mean_consumption_at_hour_7d_normalized",
 ]
 
+# %%
+# Define color palette for plots
+colors = [
+    "#31454A",
+    "#4F8A86",
+    "#D2AE8D",
+    "#C67A6C",
+    "#3D5A63",
+]
 
 # %%
 raw_df = read_consumption_data()
@@ -186,6 +195,8 @@ for week in weeks:
 
         # Create a new figure and plot the data
         plt.figure(figsize=(12, 6))
+        # Apply color palette
+        plt.gca().set_prop_cycle(color=colors)
         plt.plot(
             subset.index.get_level_values("time"),
             subset["actual"],
@@ -221,10 +232,10 @@ for week in weeks:
         plt.show()
 
 # %%
-# Plot feature importance
-xgboost.plot_importance(model)
+# Plot feature importance with correct colors
+xgboost.plot_importance(model, color=colors[0])
 
-    # %%
+# %%
 # Test on the test fold
 test_fold = folds[-1]
 X_train, y_train = test_fold[0]
@@ -371,6 +382,8 @@ for week in weeks:
 
         # Create a new figure and plot the data
         plt.figure(figsize=(12, 6))
+        # Apply color palette
+        plt.gca().set_prop_cycle(color=colors)
         plt.plot(
             subset.index.get_level_values("time"),
             subset["actual"],
@@ -418,6 +431,8 @@ for location in locations:
 
     # Create a new figure and plot the data
     plt.figure(figsize=(12, 6))
+    # Apply color palette
+    plt.gca().set_prop_cycle(color=colors)
     plt.plot(
         subset.index.get_level_values("time"),
         subset["actual"],
@@ -450,8 +465,12 @@ for location in locations:
     plt.show()
 
 # %%
-# Plot feature importance
-xgboost.plot_importance(model)
+# Plot feature importance of size 10x10
+fig, ax = plt.subplots(figsize=(10, 7))
+xgboost.plot_importance(model, ax=ax, color=colors[0])
+# Save figure
+plt.tight_layout()
+plt.savefig("analysis/importance.png")
 
 # %%
 # Plot correlation between features
@@ -460,7 +479,15 @@ all_target = pd.concat([y_train, y_test])
 all_data["consumption"] = all_target
 corr = all_data.corr()
 plt.figure(figsize=(12, 12))
-sns.heatmap(corr, annot=True, cmap=plt.cm.Reds)
+# Create gradient cmap based on colors
+cmap = matplotlib.colors.LinearSegmentedColormap.from_list(
+    "",
+    [
+        colors[1],
+        colors[0],
+    ],
+)
+sns.heatmap(corr, annot=True, cmap=cmap)
 plt.savefig("analysis/correlation.png")
 plt.show()
 
