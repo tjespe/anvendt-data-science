@@ -21,6 +21,101 @@ def read_consumption_data():
     return df
 
 
+def read_holiday_data():
+    """
+    Reads the holiday data from the csv file.
+    Resulting dataframe has columns:
+    - date: datetime, the date of the holiday
+    - event: string, name of the holiday
+    - country: string, country of the holiday
+    """
+    # Read the csv file
+    df = pd.read_csv("data/additional datasets/holidays_2022-2023.csv")
+    # Convert the date column to datetime
+    df["date"] = pd.to_datetime(df["date"]).dt.date
+    # Return the dataframe
+    return df
+
+
+# %%
+def add_time_features(df):
+    df["hour"] = df["time"].dt.strftime("%H")
+    df["season"] = df["time"].dt.month.apply(
+        lambda x: "winter"
+        if x in [12, 1, 2]
+        else "spring"
+        if x in [3, 4, 5]
+        else "summer"
+        if x in [6, 7, 8]
+        else "fall"
+    )
+    df["weekday"] = df["time"].dt.day_name()
+    df["weekend"] = df["weekday"].isin(["Saturday", "Sunday"])
+    return df
+
+
+def normalize_consumption(df, rolling_normalization_window_days):
+    if rolling_normalization_window_days:
+        cumulative_stats = (
+            df.groupby("location")["consumption"]
+            .shift(5 * 24)  # Shift by 5 days to account for lag on receiving data
+            .rolling(rolling_normalization_window_days * 24)
+            .agg(["mean", "std"])
+        )
+    else:
+        cumulative_stats = (
+            df.groupby("location")["consumption"]
+            .shift(5 * 24)  # Shift by 5 days to account for lag on receiving data
+            .expanding()
+            .agg(["mean", "std"])
+        )
+    cumulative_stats["std"].replace(0, 1, inplace=True)
+    df["consumption_normalized"] = (
+        df["consumption"] - cumulative_stats["mean"]
+    ) / cumulative_stats["std"]
+    return df, cumulative_stats
+
+
+def add_temperature_features(df):
+    df["temperature_1h_ago"] = df.groupby("location", observed=True)[
+        "temperature"
+    ].transform(lambda x: x.shift(1))
+    df["temperature_2h_ago"] = df.groupby("location", observed=True)[
+        "temperature"
+    ].transform(lambda x: x.shift(2))
+    df["temperature_3h_ago"] = df.groupby("location", observed=True)[
+        "temperature"
+    ].transform(lambda x: x.shift(3))
+    df["temperature_4_to_6h_ago"] = df.groupby("location", observed=True)[
+        "temperature"
+    ].transform(lambda x: x.shift(4).rolling(3).mean())
+    df["temperature_7_to_12h_ago"] = df.groupby("location", observed=True)[
+        "temperature"
+    ].transform(lambda x: x.shift(7).rolling(6).mean())
+    df["temperature_13_to_24h_ago"] = df.groupby("location", observed=True)[
+        "temperature"
+    ].transform(lambda x: x.shift(13).rolling(12).mean())
+    df["temperature_prev_week"] = df.groupby("location", observed=True)[
+        "temperature"
+    ].transform(lambda x: x.shift(25).rolling(6 * 24).mean())
+    df["temperature_1w_ago"] = df.groupby(
+        ["location", "hour", "weekday"], observed=True
+    )["temperature"].transform(lambda x: x.shift(1))
+    df["temperature_prev_prev_week"] = df.groupby("location", observed=True)[
+        "temperature"
+    ].transform(lambda x: x.shift(6 * 24 + 25).rolling(7 * 24).mean())
+    df["temperature_2w_ago"] = df.groupby(
+        ["location", "hour", "weekday"], observed=True
+    )["temperature"].transform(lambda x: x.shift(2))
+    df["temperature_prev_prev_prev_week"] = df.groupby("location", observed=True)[
+        "temperature"
+    ].transform(lambda x: x.shift(13 * 24 + 25).rolling(7 * 24).mean())
+    df["temperature_3w_ago"] = df.groupby(
+        ["location", "hour", "weekday"], observed=True
+    )["temperature"].transform(lambda x: x.shift(3))
+    return df
+
+
 def preprocess_consumption_data(df: pd.DataFrame, rolling_normalization_window_days=30):
     """
     Preprocesses the consumption data.
@@ -99,20 +194,9 @@ def preprocess_consumption_data(df: pd.DataFrame, rolling_normalization_window_d
 
     # df["days_to_holiday"] = ...
 
-    # Extract the hour, month, season, weekday, and weekend
-    df["hour"] = df["time"].dt.strftime("%H")
-    # df["month"] = df["time"].dt.strftime("%m") # MAPE reduced by removeing feature
-    df["season"] = df["time"].dt.month.apply(
-        lambda x: "winter"
-        if x in [12, 1, 2]
-        else "spring"
-        if x in [3, 4, 5]
-        else "summer"
-        if x in [6, 7, 8]
-        else "fall"
-    )
-    df["weekday"] = df["time"].dt.day_name()
-    df["weekend"] = df["weekday"].isin(["Saturday", "Sunday"])
+    # %%
+    # Extract the time features
+    add_time_features(df)
 
     # %%
     # Extract the location
@@ -120,24 +204,7 @@ def preprocess_consumption_data(df: pd.DataFrame, rolling_normalization_window_d
 
     # %%
     # Normalize consumption using cumulative normalization per location
-    if rolling_normalization_window_days:
-        cumulative_stats = (
-            df.groupby("location", observed=True)["consumption"]
-            .shift(5 * 24)  # Shift by 5 days to account for lag on receiving data
-            .rolling(rolling_normalization_window_days * 24)
-            .agg(["mean", "std"])
-        )
-    else:
-        cumulative_stats = (
-            df.groupby("location", observed=True)["consumption"]
-            .shift(5 * 24)  # Shift by 5 days to account for lag on receiving data
-            .expanding()
-            .agg(["mean", "std"])
-        )
-    cumulative_stats["std"].replace(0, 1, inplace=True)
-    df["consumption_normalized"] = (
-        df["consumption"] - cumulative_stats["mean"]
-    ) / cumulative_stats["std"]
+    df, cumulative_stats = normalize_consumption(df, rolling_normalization_window_days)
 
     # %%
     # Generate consumption features
@@ -166,42 +233,7 @@ def preprocess_consumption_data(df: pd.DataFrame, rolling_normalization_window_d
     ) / cumulative_stats["std"]
 
     # Extract the temperature features
-    df["temperature_1h_ago"] = df.groupby("location", observed=True)[
-        "temperature"
-    ].transform(lambda x: x.shift(1))
-    df["temperature_2h_ago"] = df.groupby("location", observed=True)[
-        "temperature"
-    ].transform(lambda x: x.shift(2))
-    df["temperature_3h_ago"] = df.groupby("location", observed=True)[
-        "temperature"
-    ].transform(lambda x: x.shift(3))
-    df["temperature_4_to_6h_ago"] = df.groupby("location", observed=True)[
-        "temperature"
-    ].transform(lambda x: x.shift(4).rolling(3).mean())
-    df["temperature_7_to_12h_ago"] = df.groupby("location", observed=True)[
-        "temperature"
-    ].transform(lambda x: x.shift(7).rolling(6).mean())
-    df["temperature_13_to_24h_ago"] = df.groupby("location", observed=True)[
-        "temperature"
-    ].transform(lambda x: x.shift(13).rolling(12).mean())
-    df["temperature_prev_week"] = df.groupby("location", observed=True)[
-        "temperature"
-    ].transform(lambda x: x.shift(25).rolling(6 * 24).mean())
-    df["temperature_1w_ago"] = df.groupby(
-        ["location", "hour", "weekday"], observed=True
-    )["temperature"].transform(lambda x: x.shift(1))
-    df["temperature_prev_prev_week"] = df.groupby("location", observed=True)[
-        "temperature"
-    ].transform(lambda x: x.shift(6 * 24 + 25).rolling(7 * 24).mean())
-    df["temperature_2w_ago"] = df.groupby(
-        ["location", "hour", "weekday"], observed=True
-    )["temperature"].transform(lambda x: x.shift(2))
-    df["temperature_prev_prev_prev_week"] = df.groupby("location", observed=True)[
-        "temperature"
-    ].transform(lambda x: x.shift(13 * 24 + 25).rolling(7 * 24).mean())
-    df["temperature_3w_ago"] = df.groupby(
-        ["location", "hour", "weekday"], observed=True
-    )["temperature"].transform(lambda x: x.shift(3))
+    df = add_temperature_features(df)
 
     # Some rows have NaN because of the lookback features, but since there are so few,
     # we drop them
@@ -213,24 +245,3 @@ def preprocess_consumption_data(df: pd.DataFrame, rolling_normalization_window_d
 
     # %%
     return df
-
-
-def read_holiday_data():
-    """
-    Reads the holiday data from the csv file.
-    Resulting dataframe has columns:
-    - date: datetime, the date of the holiday
-    - event: string, name of the holiday
-    - country: string, country of the holiday
-    """
-    # Read the csv file
-    df = pd.read_csv("data/additional datasets/holidays_2022-2023.csv")
-    # Convert the date column to datetime
-    df["date"] = pd.to_datetime(df["date"]).dt.date
-    # Return the dataframe
-    return df
-
-
-df = read_consumption_data()
-
-preprocess_consumption_data(df)

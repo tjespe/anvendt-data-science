@@ -500,6 +500,7 @@ cmap = matplotlib.colors.LinearSegmentedColormap.from_list(
     ],
 )
 sns.heatmap(corr, annot=True, cmap=cmap)
+plt.tight_layout()
 plt.savefig("analysis/correlation.png")
 plt.show()
 
