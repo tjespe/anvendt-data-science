@@ -40,6 +40,15 @@ features_to_use = [
     "mean_consumption_at_hour_7d_normalized",
 ]
 
+# %%
+# Define color palette for plots
+colors = [
+    "#31454A",
+    "#4F8A86",
+    "#D2AE8D",
+    "#C67A6C",
+    "#3D5A63",
+]
 
 # %%
 raw_df = read_consumption_data()
@@ -186,6 +195,8 @@ for week in weeks:
 
         # Create a new figure and plot the data
         plt.figure(figsize=(12, 6))
+        # Apply color palette
+        plt.gca().set_prop_cycle(color=colors)
         plt.plot(
             subset.index.get_level_values("time"),
             subset["actual"],
@@ -196,6 +207,9 @@ for week in weeks:
             subset["prediction"],
             label="Predicted",
         )
+
+        # Use whitegrid style
+        sns.set_style("whitegrid")
 
         # Set format for the x-axis
         plt.gca().xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%a %H:%M"))
@@ -221,8 +235,9 @@ for week in weeks:
         plt.show()
 
 # %%
-# Plot feature importance
-xgboost.plot_importance(model)
+# Plot feature importance with correct colors
+sns.set_style("whitegrid")
+xgboost.plot_importance(model, color=colors[0])
 
 # %%
 # Test on the test fold
@@ -457,6 +472,8 @@ for week in weeks:
 
         # Create a new figure and plot the data
         plt.figure(figsize=(12, 6))
+        # Apply color palette
+        plt.gca().set_prop_cycle(color=colors)
         plt.plot(
             subset.index.get_level_values("time"),
             subset["actual"],
@@ -478,6 +495,9 @@ for week in weeks:
         plt.xlabel("Hour of Day")
         plt.ylabel("Consumption (avg. MW in hour)")
         plt.legend()
+
+        # Use whitegrid style
+        sns.set_style("whitegrid")
 
         # Start y-axis at 0
         plt.ylim(bottom=0)
@@ -504,6 +524,8 @@ for location in locations:
 
     # Create a new figure and plot the data
     plt.figure(figsize=(12, 6))
+    # Apply color palette
+    plt.gca().set_prop_cycle(color=colors)
     plt.plot(
         subset.index.get_level_values("time"),
         subset["actual"],
@@ -522,6 +544,9 @@ for location in locations:
     plt.ylabel("Consumption (avg. MW in hour)")
     plt.legend()
 
+    # Use whitegrid style
+    sns.set_style("whitegrid")
+
     # Start y-axis at 0
     plt.ylim(bottom=0)
 
@@ -536,8 +561,14 @@ for location in locations:
     plt.show()
 
 # %%
-# Plot feature importance
-xgboost.plot_importance(model)
+# Plot feature importance of size 10x10
+fig, ax = plt.subplots(figsize=(10, 7))
+xgboost.plot_importance(model, ax=ax, color=colors[0])
+# Use whitegrid style
+sns.set_style("whitegrid")
+# Save figure
+plt.tight_layout()
+plt.savefig("analysis/importance.png")
 
 # %%
 # Plot correlation between features
@@ -546,7 +577,16 @@ all_target = pd.concat([y_train, y_test])
 all_data["consumption"] = all_target
 corr = all_data.corr()
 plt.figure(figsize=(12, 12))
-sns.heatmap(corr, annot=True, cmap=plt.cm.Reds)
+# Create gradient cmap based on colors
+cmap = matplotlib.colors.LinearSegmentedColormap.from_list(
+    "",
+    [
+        colors[1],
+        colors[0],
+    ],
+)
+sns.heatmap(corr, annot=True, cmap=cmap)
+plt.tight_layout()
 plt.savefig("analysis/correlation.png")
 plt.show()
 
