@@ -562,10 +562,21 @@ for location in locations:
 
 # %%
 # Plot feature importance of size 10x10
-fig, ax = plt.subplots(figsize=(10, 7))
+fig, ax = plt.subplots(figsize=(12, 7))
 xgboost.plot_importance(model, ax=ax, color=colors[0])
+for text in ax.texts:
+    text.set_fontsize(14)  # Adjust the font size as needed
 # Use whitegrid style
 sns.set_style("whitegrid")
+# set title to size 18 and Arial font
+plt.title("Feature Importance", size=18, fontname="Arial", y=1.02)
+# set x and y labels to size 14 and Arial font
+plt.xlabel("F score", size=16, fontname="Arial")
+plt.ylabel("Feature", size=16, fontname="Arial")
+# set ticks to size 16 and Arial font
+plt.xticks(size=16, fontname="Arial")
+plt.yticks(size=16, fontname="Arial")
+
 # Save figure
 plt.tight_layout()
 plt.savefig("analysis/importance.png")
@@ -576,7 +587,7 @@ all_data = pd.concat([X_train, X_test])
 all_target = pd.concat([y_train, y_test])
 all_data["consumption"] = all_target
 corr = all_data.corr()
-plt.figure(figsize=(12, 12))
+plt.figure(figsize=(13, 12))
 # Create gradient cmap based on colors
 cmap = matplotlib.colors.LinearSegmentedColormap.from_list(
     "",
@@ -585,7 +596,13 @@ cmap = matplotlib.colors.LinearSegmentedColormap.from_list(
         colors[0],
     ],
 )
-sns.heatmap(corr, annot=True, cmap=cmap)
+sns.heatmap(corr, annot=True, cmap=cmap, annot_kws={"size": 15, "fontname": "Arial"})
+plt.title("Temperature and Consumption Correlation per Season", fontname="Arial", fontsize=20, y=1.02)
+plt.xlabel("Feature", fontname="Arial", fontsize=16)
+plt.ylabel("Feature", fontname="Arial", fontsize=16)
+# set ticks to size 16 and Arial font
+plt.xticks(size=14, fontname="Arial")
+plt.yticks(size=14, fontname="Arial")
 plt.tight_layout()
 plt.savefig("analysis/correlation.png")
 plt.show()
