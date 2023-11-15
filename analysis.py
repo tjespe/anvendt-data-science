@@ -474,15 +474,17 @@ for week in weeks:
         plt.figure(figsize=(12, 6))
         # Apply color palette
         plt.gca().set_prop_cycle(color=colors)
-        plt.plot(
-            subset.index.get_level_values("time"),
-            subset["actual"],
+        sns.lineplot(
+            x=subset.index.get_level_values("time"),
+            y=subset["actual"],
             label="Actual",
+            linewidth=2,
         )
-        plt.plot(
-            subset.index.get_level_values("time"),
-            subset["prediction"],
+        sns.lineplot(
+            x=subset.index.get_level_values("time"),
+            y=subset["prediction"],
             label="Predicted",
+            linewidth=2,
         )
 
         # Set format for the x-axis
@@ -490,11 +492,12 @@ for week in weeks:
 
         # Customize the plot
         plt.title(
-            f"Week {week} - Actual vs. Predicted Consumption in {location[0].upper()+location[1:]}"
+            f"Week {week} - Actual vs. Predicted Consumption in {location[0].upper()+location[1:]}", size=18
+            , fontname="Arial", y=1.02
         )
-        plt.xlabel("Hour of Day")
-        plt.ylabel("Consumption (avg. MW in hour)")
-        plt.legend()
+        plt.xlabel("Hour of Day", size=16, fontname="Arial")
+        plt.ylabel("Consumption (avg. MW in hour)", size=16, fontname="Arial")
+        plt.legend(fontsize=12, loc="upper left")
 
         # Use whitegrid style
         sns.set_style("whitegrid")
@@ -507,7 +510,9 @@ for week in weeks:
 
         # Display the plot or save it as an image
         plt.grid(True)
-        plt.xticks(rotation=45)
+        plt.xticks(rotation=45, size=16, fontname="Arial")
+        # set ticks to size 16 and Arial font
+        plt.yticks(size=16, fontname="Arial")
         plt.tight_layout()
         plt.savefig(f"analysis/Test data predictions/week_{week}_{location}.png")
         plt.show()
@@ -526,23 +531,27 @@ for location in locations:
     plt.figure(figsize=(12, 6))
     # Apply color palette
     plt.gca().set_prop_cycle(color=colors)
-    plt.plot(
-        subset.index.get_level_values("time"),
-        subset["actual"],
+    sns.lineplot(
+        x=subset.index.get_level_values("time"),
+        y=subset["actual"],
         label="Actual",
+        linewidth=2,
     )
-    plt.plot(
-        subset.index.get_level_values("time"),
-        subset["prediction"],
+    sns.lineplot(
+        x=subset.index.get_level_values("time"),
+        y=subset["prediction"],
         label="Predicted",
+        linewidth=2,
     )
 
     # Customize the plot
     plt.title(
-        f"Actual vs. Predicted Consumption in {location[0].upper()+location[1:]} (Test Data)"
+        f"Actual vs. Predicted Consumption in {location[0].upper()+location[1:]} (Test Data)",
+        size=18, fontname="Arial", y=1.02
     )
-    plt.ylabel("Consumption (avg. MW in hour)")
-    plt.legend()
+    plt.xlabel("Time", size=16, fontname="Arial")
+    plt.ylabel("Consumption (avg. MW in hour)", size=16, fontname="Arial")
+    plt.legend(fontsize=12, loc="upper left")
 
     # Use whitegrid style
     sns.set_style("whitegrid")
@@ -555,7 +564,9 @@ for location in locations:
 
     # Display the plot or save it as an image
     plt.grid(True)
-    plt.xticks(rotation=45)
+    plt.xticks(rotation=45, size=16, fontname="Arial")
+    # set ticks to size 16 and Arial font
+    plt.yticks(size=16, fontname="Arial")
     plt.tight_layout()
     plt.savefig(f"analysis/Test data predictions/{location}.png")
     plt.show()
