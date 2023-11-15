@@ -224,7 +224,7 @@ for week in weeks:
 # Plot feature importance
 xgboost.plot_importance(model)
 
-    # %%
+# %%
 # Test on the test fold
 test_fold = folds[-1]
 X_train, y_train = test_fold[0]
@@ -347,6 +347,85 @@ print(
 )
 
 # %%
+# Adding differeces from actual
+results_df["diff_pred"] = results_df["actual"] - results_df["prediction"]
+results_df["diff_baseline"] = results_df["actual"] - results_df["baseline"]
+results_df["diff_raw"] = results_df["actual"] - results_df["raw_prediction"]
+
+
+
+results_df.head()
+
+
+# %%
+# Calculating standard deviations for each of the differences
+
+std_pred = results_df["diff_pred"].std()
+std_baseline = results_df["diff_baseline"].std()
+std_raw = results_df["diff_raw"].std()
+
+print(f"Standard deviation for prediction: {std_pred}")
+print(f"Standard deviation for baseline: {std_baseline}")
+print(f"Standard deviation for raw: {std_raw}")
+
+# %%
+# calculating the number of instances where the absolute difference is above 0.1 for each of the models
+number_of_instances_pred = results_df[results_df["diff_pred"].abs() > 0.1].shape[0]
+number_of_instances_baseline = results_df[results_df["diff_baseline"].abs() > 0.1].shape[0]
+number_of_instances_raw = results_df[results_df["diff_raw"].abs() > 0.1].shape[0]
+#printing the results
+print(f"Number of instances where the absolute difference is above 0.1 for prediction: {number_of_instances_pred}")
+print(f"Number of instances where the absolute difference is above 0.1 for baseline: {number_of_instances_baseline}")
+print(f"Number of instances where the absolute difference is above 0.1 for raw: {number_of_instances_raw}")
+#calculate the percentage of instances for each of the models
+percentage_pred = number_of_instances_pred / results_df.shape[0]
+percentage_baseline = number_of_instances_baseline / results_df.shape[0]
+percentage_raw = number_of_instances_raw / results_df.shape[0]
+#printing the results
+print(f"Percentage of instances where the absolute difference is above 0.1 for prediction: {percentage_pred}")
+print(f"Percentage of instances where the absolute difference is above 0.1 for baseline: {percentage_baseline}")
+print(f"Percentage of instances where the absolute difference is above 0.1 for raw: {percentage_raw}")
+
+# calculating the number of instances where the absolute difference is above 0.5 for each of the models
+number_of_instances_pred = results_df[results_df["diff_pred"].abs() > 0.5].shape[0]
+number_of_instances_baseline = results_df[results_df["diff_baseline"].abs() > 0.5].shape[0]
+number_of_instances_raw = results_df[results_df["diff_raw"].abs() > 0.5].shape[0]
+#printing the results
+print(f"Number of instances where the absolute difference is above 0.5 for prediction: {number_of_instances_pred}")
+print(f"Number of instances where the absolute difference is above 0.5 for baseline: {number_of_instances_baseline}")
+print(f"Number of instances where the absolute difference is above 0.5 for raw: {number_of_instances_raw}")
+#calculate the percentage of instances for each of the models
+percentage_pred = number_of_instances_pred / results_df.shape[0]
+percentage_baseline = number_of_instances_baseline / results_df.shape[0]
+percentage_raw = number_of_instances_raw / results_df.shape[0]
+#printing the results
+print(f"Percentage of instances where the absolute difference is above 0.5 for prediction: {percentage_pred}")
+print(f"Percentage of instances where the absolute difference is above 0.5 for baseline: {percentage_baseline}")
+print(f"Percentage of instances where the absolute difference is above 0.5 for raw: {percentage_raw}")
+
+
+# calculating the number of instances where the absolute difference is above 1 for each of the models
+number_of_instances_pred = results_df[results_df["diff_pred"].abs() > 1].shape[0]
+number_of_instances_baseline = results_df[results_df["diff_baseline"].abs() > 1].shape[0]
+number_of_instances_raw = results_df[results_df["diff_raw"].abs() > 1].shape[0]
+# printing the results
+print(f"Number of instances where the absolute difference is above 1 for prediction: {number_of_instances_pred}")
+print(f"Number of instances where the absolute difference is above 1 for baseline: {number_of_instances_baseline}")
+print(f"Number of instances where the absolute difference is above 1 for raw: {number_of_instances_raw}")
+
+#calculate the percentage of instances for each of the models
+percentage_pred = number_of_instances_pred / results_df.shape[0]
+percentage_baseline = number_of_instances_baseline / results_df.shape[0]
+percentage_raw = number_of_instances_raw / results_df.shape[0]
+#printing the results
+print(f"Percentage of instances where the absolute difference is above 1 for prediction: {percentage_pred}")
+print(f"Percentage of instances where the absolute difference is above 1 for baseline: {percentage_baseline}")
+print(f"Percentage of instances where the absolute difference is above 1 for raw: {percentage_raw}")
+
+
+
+
+# %%
 results_df = results_df.reset_index()
 results_df["date"] = results_df["time"].dt.date
 results_df["week"] = results_df["time"].dt.strftime("%W")
@@ -354,6 +433,13 @@ dates = results_df["date"].unique()
 weeks = results_df["week"].unique()
 locations = results_df["location"].unique()
 results_df = results_df.set_index(["time", "location"])
+
+#%%
+results_df.head()
+
+# %%
+# create a CSV file with the results
+results_df.to_csv("results.csv")
 
 # %%
 # Loop through each week and create a separate line graph
