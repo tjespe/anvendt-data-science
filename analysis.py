@@ -452,6 +452,122 @@ results_df = results_df.set_index(["time", "location"])
 #%%
 results_df.head()
 
+#%% making the final figure
+
+# calculate the MAPE for predection and baseline for each location individually
+mape_pred = results_df.groupby(results_df.index.get_level_values("location"), observed=True)["APE"].mean()
+mape_baseline = results_df.groupby(results_df.index.get_level_values("location"), observed=True)["APE_baseline"].mean()
+
+# calculate the MPE for predection and baseline for each location individually
+mpe_pred = results_df.groupby(results_df.index.get_level_values("location"), observed=True)["PE"].mean()
+mpe_baseline = results_df.groupby(results_df.index.get_level_values("location"), observed=True)["PE_baseline"].mean()
+
+# sort the locations by: Oslo, Trondheim, Bergen, Stavanger, Tromsø
+mape_pred = mape_pred.reindex(["oslo", "trondheim", "bergen", "stavanger", "tromsø"])
+mape_baseline = mape_baseline.reindex(["oslo", "trondheim", "bergen", "stavanger", "tromsø"])
+mpe_pred = mpe_pred.reindex(["oslo", "trondheim", "bergen", "stavanger", "tromsø"])
+mpe_baseline = mpe_baseline.reindex(["oslo", "trondheim", "bergen", "stavanger", "tromsø"])
+
+# make capital letter for location
+mape_pred.index = mape_pred.index.str.capitalize()
+mape_baseline.index = mape_baseline.index.str.capitalize()
+mpe_pred.index = mpe_pred.index.str.capitalize()
+mpe_baseline.index = mpe_baseline.index.str.capitalize()
+
+print(mape_pred)
+
+# make a variable called "locations" for the locations which is a list
+locations = ["Oslo", "Trondheim", "Bergen", "Stavanger", "Tromsø"]
+# make a list called "mape_pred_list" which is the MAPE for prediction for each location
+mape_pred_list = mape_pred.tolist()
+print(mape_pred_list)
+# make a list called "mape_baseline_list" which is the MAPE for baseline for each location
+mape_baseline_list = mape_baseline.tolist()
+
+df = pd.DataFrame({"Location": locations*2, "Values": mape_pred_list + mape_baseline_list, "": ["MAPE (model)"]*len(locations) + ["MAPE (baseline)"]*len(locations)})
+# Create a side-by-side bar plot
+plt.figure(figsize=(12, 7))
+# Apply color palette
+plt.gca().set_prop_cycle(color=colors)
+
+# Create bar plot and set color to the same as the line plot
+sns.barplot(x="Location", y="Values", hue="", data=df, palette=colors, linewidth=2)
+
+# make sns scatter plot for the MPE for prediction and baseline
+sns.scatterplot(x=mpe_pred.index, y=mpe_pred, color=colors[0], s=250, marker="o", label="MPE (model)")
+sns.scatterplot(x=mpe_baseline.index, y=mpe_baseline, color=colors[1], s=250, marker="o", label="MPE (baseline)")
+
+# set legend fontsize to 12 and to upper right corner
+plt.legend(fontsize=12, loc="upper right")
+
+# plt.legend(fontsize=12, labels=["MAPE", "MAPE (baseline)", "MPE", "MPE (baseline)"])
+sns.set_style("whitegrid")
+# set title to size 18 and Arial font
+plt.title("MAPE and MPE for Forecasting Model and Baseline", size=20, fontname="Arial", y=1.02)
+# set x and y labels to size 14 and Arial font
+plt.xlabel("Location", size=18, fontname="Arial")
+#give the X label a little space
+plt.gca().xaxis.labelpad = 10
+plt.ylabel("Percentage Error (%)", size=18, fontname="Arial")
+
+# set the x values to % 
+plt.gca().set_yticklabels(['{:.0f}%'.format(x) for x in plt.gca().get_yticks()])
+# set ticks to size 16 and Arial font
+plt.xticks(size=16, fontname="Arial")
+plt.yticks(size=16, fontname="Arial")
+# make the legend a square
+# Save figure
+plt.tight_layout()
+plt.show()
+
+# %% Making one for only mape for the presentation
+locations = ["Oslo", "Trondheim", "Bergen", "Stavanger", "Tromsø"]
+# make a list called "mape_pred_list" which is the MAPE for prediction for each location
+mape_pred_list = mape_pred.tolist()
+print(mape_pred_list)
+# make a list called "mape_baseline_list" which is the MAPE for baseline for each location
+mape_baseline_list = mape_baseline.tolist()
+
+df = pd.DataFrame({"Location": locations*2, "Values": mape_pred_list + mape_baseline_list, "": ["MAPE (model)"]*len(locations) + ["MAPE (baseline)"]*len(locations)})
+# Create a side-by-side bar plot
+plt.figure(figsize=(9, 7))
+# make y-axis go from 0 to 20 with 5 steps between each tick
+plt.yticks(np.arange(0, 21, 5))
+
+# Apply color palette
+plt.gca().set_prop_cycle(color=colors)
+
+# Create bar plot and set color to the same as the line plot, make bars thin
+sns.barplot(x="Location", y="Values", hue="", data=df, palette=colors, width=0.6)
+# make bars thinner
+
+# set legend fontsize to 12 and to upper right corner
+plt.legend(fontsize=12, loc="upper right")
+
+# plt.legend(fontsize=12, labels=["MAPE", "MAPE (baseline)", "MPE", "MPE (baseline)"])
+sns.set_style("whitegrid")
+# set title to size 18 and Arial font
+plt.title("MAPE Forecasting Model vs. Baseline", size=18, fontname="Arial", y=1.02)
+# set x and y labels to size 14 and Arial font
+plt.xlabel("Location", size=16, fontname="Arial")
+#give the X label a little space
+plt.gca().xaxis.labelpad = 10
+# set y label to nothing
+plt.ylabel("", size=16, fontname="Arial")
+
+# set the x values to % 
+plt.gca().set_yticklabels(['{:.0f}%'.format(x) for x in plt.gca().get_yticks()])
+# set ticks to size 16 and Arial font
+plt.xticks(size=14, fontname="Arial")
+plt.yticks(size=14, fontname="Arial")
+# make the legend a square
+# Save figure
+plt.tight_layout()
+plt.show()
+
+
+
+
 # %%
 # create a CSV file with the results
 results_df.to_csv("results.csv")
