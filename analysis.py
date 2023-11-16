@@ -669,6 +669,8 @@ for week in weeks:
             ("Baseline", "baseline", "_baseline", colors[2]),
         ]:
             # Create a new figure and plot the data
+            # (12, 6) for report
+            # (8, 6) for presentation
             plt.figure(figsize=(12, 6))
             # Apply color palette
             plt.gca().set_prop_cycle(color=colors)
