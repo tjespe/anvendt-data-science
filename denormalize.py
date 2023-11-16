@@ -1,4 +1,5 @@
 import pandas as pd
+from preprocessing import get_cumulative_stats
 
 
 def denormalize_predictions(
@@ -31,19 +32,9 @@ def denormalize_predictions(
     """
     df = predictions.copy()
     stats_df = raw_df[["time", "location", "consumption"]].copy().sort_values(by="time")
-
-    def make_window(group_by_obj):
-        if rolling_normalization_window_size:
-            return group_by_obj.rolling(rolling_normalization_window_size)
-        return group_by_obj.expanding()
-
-    stats_df[["mean", "std"]] = (
-        make_window(
-            stats_df.groupby("location", observed=True)["consumption"].shift(
-                5 * 24
-            )  # Shift by 5 days to account for data lag
-        ).agg(["mean", "std"])
-    )[["mean", "std"]]
+    stats_df[["mean", "std"]] = get_cumulative_stats(
+        stats_df, rolling_normalization_window_size
+    )
     stats_df = stats_df.set_index(["time", "location"])
     df["prediction"] = df["prediction"] * stats_df["std"] + stats_df["mean"]
     df["actual"] = df["actual"] * stats_df["std"] + stats_df["mean"]

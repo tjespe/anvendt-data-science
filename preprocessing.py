@@ -54,7 +54,8 @@ def add_time_features(df):
     return df
 
 
-def normalize_consumption(df, rolling_normalization_window_days):
+def get_cumulative_stats(df, rolling_normalization_window_days):
+    # df = df.copy().reset_index().sort_values(by="time")
     if rolling_normalization_window_days:
         cumulative_stats = (
             df.groupby("location")["consumption"]
@@ -70,6 +71,11 @@ def normalize_consumption(df, rolling_normalization_window_days):
             .agg(["mean", "std"])
         )
     cumulative_stats["std"].replace(0, 1, inplace=True)
+    return cumulative_stats
+
+
+def normalize_consumption(df, rolling_normalization_window_days):
+    cumulative_stats = get_cumulative_stats(df, rolling_normalization_window_days)
     df["consumption_normalized"] = (
         df["consumption"] - cumulative_stats["mean"]
     ) / cumulative_stats["std"]

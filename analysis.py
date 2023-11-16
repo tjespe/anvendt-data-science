@@ -306,7 +306,7 @@ raw_X_test = pd.get_dummies(raw_X_test)
 raw_y_test_pred = predict_xgb(raw_model, raw_X_test)
 rmse = np.sqrt(mean_squared_error(raw_y_test, raw_y_test_pred))
 print(f"RMSE (raw): {rmse}")
-test_results_df = pd.DataFrame(
+raw_results_df = pd.DataFrame(
     {
         "actual": raw_y_test,
         "raw_prediction": raw_y_test_pred,
@@ -320,7 +320,7 @@ results_df = results_df.join(baseline_df["baseline"])
 
 # %%
 # Add raw prediction
-results_df = results_df.join(test_results_df["raw_prediction"])
+results_df = results_df.join(raw_results_df["raw_prediction"])
 
 # %%
 # Calculate RMSE for denormalized data
@@ -368,7 +368,6 @@ results_df["diff_baseline"] = results_df["actual"] - results_df["baseline"]
 results_df["diff_raw"] = results_df["actual"] - results_df["raw_prediction"]
 
 
-
 results_df.head()
 
 
@@ -386,58 +385,98 @@ print(f"Standard deviation for raw: {std_raw}")
 # %%
 # calculating the number of instances where the absolute difference is above 0.1 for each of the models
 number_of_instances_pred = results_df[results_df["diff_pred"].abs() > 0.1].shape[0]
-number_of_instances_baseline = results_df[results_df["diff_baseline"].abs() > 0.1].shape[0]
+number_of_instances_baseline = results_df[
+    results_df["diff_baseline"].abs() > 0.1
+].shape[0]
 number_of_instances_raw = results_df[results_df["diff_raw"].abs() > 0.1].shape[0]
-#printing the results
-print(f"Number of instances where the absolute difference is above 0.1 for prediction: {number_of_instances_pred}")
-print(f"Number of instances where the absolute difference is above 0.1 for baseline: {number_of_instances_baseline}")
-print(f"Number of instances where the absolute difference is above 0.1 for raw: {number_of_instances_raw}")
-#calculate the percentage of instances for each of the models
+# printing the results
+print(
+    f"Number of instances where the absolute difference is above 0.1 for prediction: {number_of_instances_pred}"
+)
+print(
+    f"Number of instances where the absolute difference is above 0.1 for baseline: {number_of_instances_baseline}"
+)
+print(
+    f"Number of instances where the absolute difference is above 0.1 for raw: {number_of_instances_raw}"
+)
+# calculate the percentage of instances for each of the models
 percentage_pred = number_of_instances_pred / results_df.shape[0]
 percentage_baseline = number_of_instances_baseline / results_df.shape[0]
 percentage_raw = number_of_instances_raw / results_df.shape[0]
-#printing the results
-print(f"Percentage of instances where the absolute difference is above 0.1 for prediction: {percentage_pred}")
-print(f"Percentage of instances where the absolute difference is above 0.1 for baseline: {percentage_baseline}")
-print(f"Percentage of instances where the absolute difference is above 0.1 for raw: {percentage_raw}")
+# printing the results
+print(
+    f"Percentage of instances where the absolute difference is above 0.1 for prediction: {percentage_pred}"
+)
+print(
+    f"Percentage of instances where the absolute difference is above 0.1 for baseline: {percentage_baseline}"
+)
+print(
+    f"Percentage of instances where the absolute difference is above 0.1 for raw: {percentage_raw}"
+)
 
 # calculating the number of instances where the absolute difference is above 0.5 for each of the models
 number_of_instances_pred = results_df[results_df["diff_pred"].abs() > 0.5].shape[0]
-number_of_instances_baseline = results_df[results_df["diff_baseline"].abs() > 0.5].shape[0]
+number_of_instances_baseline = results_df[
+    results_df["diff_baseline"].abs() > 0.5
+].shape[0]
 number_of_instances_raw = results_df[results_df["diff_raw"].abs() > 0.5].shape[0]
-#printing the results
-print(f"Number of instances where the absolute difference is above 0.5 for prediction: {number_of_instances_pred}")
-print(f"Number of instances where the absolute difference is above 0.5 for baseline: {number_of_instances_baseline}")
-print(f"Number of instances where the absolute difference is above 0.5 for raw: {number_of_instances_raw}")
-#calculate the percentage of instances for each of the models
+# printing the results
+print(
+    f"Number of instances where the absolute difference is above 0.5 for prediction: {number_of_instances_pred}"
+)
+print(
+    f"Number of instances where the absolute difference is above 0.5 for baseline: {number_of_instances_baseline}"
+)
+print(
+    f"Number of instances where the absolute difference is above 0.5 for raw: {number_of_instances_raw}"
+)
+# calculate the percentage of instances for each of the models
 percentage_pred = number_of_instances_pred / results_df.shape[0]
 percentage_baseline = number_of_instances_baseline / results_df.shape[0]
 percentage_raw = number_of_instances_raw / results_df.shape[0]
-#printing the results
-print(f"Percentage of instances where the absolute difference is above 0.5 for prediction: {percentage_pred}")
-print(f"Percentage of instances where the absolute difference is above 0.5 for baseline: {percentage_baseline}")
-print(f"Percentage of instances where the absolute difference is above 0.5 for raw: {percentage_raw}")
+# printing the results
+print(
+    f"Percentage of instances where the absolute difference is above 0.5 for prediction: {percentage_pred}"
+)
+print(
+    f"Percentage of instances where the absolute difference is above 0.5 for baseline: {percentage_baseline}"
+)
+print(
+    f"Percentage of instances where the absolute difference is above 0.5 for raw: {percentage_raw}"
+)
 
 
 # calculating the number of instances where the absolute difference is above 1 for each of the models
 number_of_instances_pred = results_df[results_df["diff_pred"].abs() > 1].shape[0]
-number_of_instances_baseline = results_df[results_df["diff_baseline"].abs() > 1].shape[0]
+number_of_instances_baseline = results_df[results_df["diff_baseline"].abs() > 1].shape[
+    0
+]
 number_of_instances_raw = results_df[results_df["diff_raw"].abs() > 1].shape[0]
 # printing the results
-print(f"Number of instances where the absolute difference is above 1 for prediction: {number_of_instances_pred}")
-print(f"Number of instances where the absolute difference is above 1 for baseline: {number_of_instances_baseline}")
-print(f"Number of instances where the absolute difference is above 1 for raw: {number_of_instances_raw}")
+print(
+    f"Number of instances where the absolute difference is above 1 for prediction: {number_of_instances_pred}"
+)
+print(
+    f"Number of instances where the absolute difference is above 1 for baseline: {number_of_instances_baseline}"
+)
+print(
+    f"Number of instances where the absolute difference is above 1 for raw: {number_of_instances_raw}"
+)
 
-#calculate the percentage of instances for each of the models
+# calculate the percentage of instances for each of the models
 percentage_pred = number_of_instances_pred / results_df.shape[0]
 percentage_baseline = number_of_instances_baseline / results_df.shape[0]
 percentage_raw = number_of_instances_raw / results_df.shape[0]
-#printing the results
-print(f"Percentage of instances where the absolute difference is above 1 for prediction: {percentage_pred}")
-print(f"Percentage of instances where the absolute difference is above 1 for baseline: {percentage_baseline}")
-print(f"Percentage of instances where the absolute difference is above 1 for raw: {percentage_raw}")
-
-
+# printing the results
+print(
+    f"Percentage of instances where the absolute difference is above 1 for prediction: {percentage_pred}"
+)
+print(
+    f"Percentage of instances where the absolute difference is above 1 for baseline: {percentage_baseline}"
+)
+print(
+    f"Percentage of instances where the absolute difference is above 1 for raw: {percentage_raw}"
+)
 
 
 # %%
@@ -449,24 +488,36 @@ weeks = results_df["week"].unique()
 locations = results_df["location"].unique()
 results_df = results_df.set_index(["time", "location"])
 
-#%%
+# %%
 results_df.head()
 
-#%% making the final figure
+# %% making the final figure
 
 # calculate the MAPE for predection and baseline for each location individually
-mape_pred = results_df.groupby(results_df.index.get_level_values("location"), observed=True)["APE"].mean()
-mape_baseline = results_df.groupby(results_df.index.get_level_values("location"), observed=True)["APE_baseline"].mean()
+mape_pred = results_df.groupby(
+    results_df.index.get_level_values("location"), observed=True
+)["APE"].mean()
+mape_baseline = results_df.groupby(
+    results_df.index.get_level_values("location"), observed=True
+)["APE_baseline"].mean()
 
 # calculate the MPE for predection and baseline for each location individually
-mpe_pred = results_df.groupby(results_df.index.get_level_values("location"), observed=True)["PE"].mean()
-mpe_baseline = results_df.groupby(results_df.index.get_level_values("location"), observed=True)["PE_baseline"].mean()
+mpe_pred = results_df.groupby(
+    results_df.index.get_level_values("location"), observed=True
+)["PE"].mean()
+mpe_baseline = results_df.groupby(
+    results_df.index.get_level_values("location"), observed=True
+)["PE_baseline"].mean()
 
 # sort the locations by: Oslo, Trondheim, Bergen, Stavanger, Tromsø
 mape_pred = mape_pred.reindex(["oslo", "trondheim", "bergen", "stavanger", "tromsø"])
-mape_baseline = mape_baseline.reindex(["oslo", "trondheim", "bergen", "stavanger", "tromsø"])
+mape_baseline = mape_baseline.reindex(
+    ["oslo", "trondheim", "bergen", "stavanger", "tromsø"]
+)
 mpe_pred = mpe_pred.reindex(["oslo", "trondheim", "bergen", "stavanger", "tromsø"])
-mpe_baseline = mpe_baseline.reindex(["oslo", "trondheim", "bergen", "stavanger", "tromsø"])
+mpe_baseline = mpe_baseline.reindex(
+    ["oslo", "trondheim", "bergen", "stavanger", "tromsø"]
+)
 
 # make capital letter for location
 mape_pred.index = mape_pred.index.str.capitalize()
@@ -484,7 +535,13 @@ print(mape_pred_list)
 # make a list called "mape_baseline_list" which is the MAPE for baseline for each location
 mape_baseline_list = mape_baseline.tolist()
 
-df = pd.DataFrame({"Location": locations*2, "Values": mape_pred_list + mape_baseline_list, "": ["MAPE (model)"]*len(locations) + ["MAPE (baseline)"]*len(locations)})
+df = pd.DataFrame(
+    {
+        "Location": locations * 2,
+        "Values": mape_pred_list + mape_baseline_list,
+        "": ["MAPE (model)"] * len(locations) + ["MAPE (baseline)"] * len(locations),
+    }
+)
 # Create a side-by-side bar plot
 plt.figure(figsize=(12, 7))
 # Apply color palette
@@ -494,8 +551,22 @@ plt.gca().set_prop_cycle(color=colors)
 sns.barplot(x="Location", y="Values", hue="", data=df, palette=colors, linewidth=2)
 
 # make sns scatter plot for the MPE for prediction and baseline
-sns.scatterplot(x=mpe_pred.index, y=mpe_pred, color=colors[0], s=250, marker="o", label="MPE (model)")
-sns.scatterplot(x=mpe_baseline.index, y=mpe_baseline, color=colors[1], s=250, marker="o", label="MPE (baseline)")
+sns.scatterplot(
+    x=mpe_pred.index,
+    y=mpe_pred,
+    color=colors[0],
+    s=250,
+    marker="o",
+    label="MPE (model)",
+)
+sns.scatterplot(
+    x=mpe_baseline.index,
+    y=mpe_baseline,
+    color=colors[1],
+    s=250,
+    marker="o",
+    label="MPE (baseline)",
+)
 
 # set legend fontsize to 12 and to upper right corner
 plt.legend(fontsize=12, loc="upper right")
@@ -503,15 +574,17 @@ plt.legend(fontsize=12, loc="upper right")
 # plt.legend(fontsize=12, labels=["MAPE", "MAPE (baseline)", "MPE", "MPE (baseline)"])
 sns.set_style("whitegrid")
 # set title to size 18 and Arial font
-plt.title("MAPE and MPE for Forecasting Model and Baseline", size=20, fontname="Arial", y=1.02)
+plt.title(
+    "MAPE and MPE for Forecasting Model and Baseline", size=20, fontname="Arial", y=1.02
+)
 # set x and y labels to size 14 and Arial font
 plt.xlabel("Location", size=18, fontname="Arial")
-#give the X label a little space
+# give the X label a little space
 plt.gca().xaxis.labelpad = 10
 plt.ylabel("Percentage Error (%)", size=18, fontname="Arial")
 
-# set the x values to % 
-plt.gca().set_yticklabels(['{:.0f}%'.format(x) for x in plt.gca().get_yticks()])
+# set the x values to %
+plt.gca().set_yticklabels(["{:.0f}%".format(x) for x in plt.gca().get_yticks()])
 # set ticks to size 16 and Arial font
 plt.xticks(size=16, fontname="Arial")
 plt.yticks(size=16, fontname="Arial")
@@ -528,7 +601,13 @@ print(mape_pred_list)
 # make a list called "mape_baseline_list" which is the MAPE for baseline for each location
 mape_baseline_list = mape_baseline.tolist()
 
-df = pd.DataFrame({"Location": locations*2, "Values": mape_pred_list + mape_baseline_list, "": ["MAPE (model)"]*len(locations) + ["MAPE (baseline)"]*len(locations)})
+df = pd.DataFrame(
+    {
+        "Location": locations * 2,
+        "Values": mape_pred_list + mape_baseline_list,
+        "": ["MAPE (model)"] * len(locations) + ["MAPE (baseline)"] * len(locations),
+    }
+)
 # Create a side-by-side bar plot
 plt.figure(figsize=(9, 7))
 # make y-axis go from 0 to 20 with 5 steps between each tick
@@ -550,13 +629,13 @@ sns.set_style("whitegrid")
 plt.title("MAPE Forecasting Model vs. Baseline", size=18, fontname="Arial", y=1.02)
 # set x and y labels to size 14 and Arial font
 plt.xlabel("Location", size=16, fontname="Arial")
-#give the X label a little space
+# give the X label a little space
 plt.gca().xaxis.labelpad = 10
 # set y label to nothing
 plt.ylabel("", size=16, fontname="Arial")
 
-# set the x values to % 
-plt.gca().set_yticklabels(['{:.0f}%'.format(x) for x in plt.gca().get_yticks()])
+# set the x values to %
+plt.gca().set_yticklabels(["{:.0f}%".format(x) for x in plt.gca().get_yticks()])
 # set ticks to size 16 and Arial font
 plt.xticks(size=14, fontname="Arial")
 plt.yticks(size=14, fontname="Arial")
@@ -566,14 +645,13 @@ plt.tight_layout()
 plt.show()
 
 
-
-
 # %%
 # create a CSV file with the results
 results_df.to_csv("results.csv")
 
 # %%
 # Loop through each week and create a separate line graph
+locations = ["oslo", "trondheim", "bergen", "stavanger", "tromsø"]
 for week in weeks:
     for location in locations:
         # Filter data for the current week
@@ -586,52 +664,63 @@ for week in weeks:
         if subset.empty:
             continue
 
-        # Create a new figure and plot the data
-        plt.figure(figsize=(12, 6))
-        # Apply color palette
-        plt.gca().set_prop_cycle(color=colors)
-        sns.lineplot(
-            x=subset.index.get_level_values("time"),
-            y=subset["actual"],
-            label="Actual",
-            linewidth=2,
-        )
-        sns.lineplot(
-            x=subset.index.get_level_values("time"),
-            y=subset["prediction"],
-            label="Predicted",
-            linewidth=2,
-        )
+        for label, key, fname_suffix, color in [
+            ("Predicted", "prediction", "", colors[1]),
+            ("Baseline", "baseline", "_baseline", colors[2]),
+        ]:
+            # Create a new figure and plot the data
+            plt.figure(figsize=(12, 6))
+            # Apply color palette
+            plt.gca().set_prop_cycle(color=colors)
+            sns.lineplot(
+                x=subset.index.get_level_values("time"),
+                y=subset["actual"],
+                label="Actual",
+                linewidth=2,
+            )
+            sns.lineplot(
+                x=subset.index.get_level_values("time"),
+                y=subset[key],
+                label=label,
+                linewidth=2,
+                color=color,
+            )
 
-        # Set format for the x-axis
-        plt.gca().xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%a %H:%M"))
+            # Set format for the x-axis
+            plt.gca().xaxis.set_major_formatter(
+                matplotlib.dates.DateFormatter("%a %H:%M")
+            )
 
-        # Customize the plot
-        plt.title(
-            f"Week {week} - Actual vs. Predicted Consumption in {location[0].upper()+location[1:]}", size=18
-            , fontname="Arial", y=1.02
-        )
-        plt.xlabel("Hour of Day", size=16, fontname="Arial")
-        plt.ylabel("Consumption (avg. MW in hour)", size=16, fontname="Arial")
-        plt.legend(fontsize=12, loc="upper left")
+            # Customize the plot
+            plt.title(
+                f"Week {week} - Actual vs. {label} Consumption in {location[0].upper()+location[1:]}",
+                size=18,
+                fontname="Arial",
+                y=1.02,
+            )
+            plt.xlabel("Hour of Day", size=16, fontname="Arial")
+            plt.ylabel("Consumption (avg. MW in hour)", size=16, fontname="Arial")
+            plt.legend(fontsize=12, loc="upper left")
 
-        # Use whitegrid style
-        sns.set_style("whitegrid")
+            # Use whitegrid style
+            sns.set_style("whitegrid")
 
-        # Start y-axis at 0
-        plt.ylim(bottom=0)
+            # Start y-axis at 0
+            plt.ylim(bottom=0)
 
-        # Set top of y-axis to 1.5 times the maximum value
-        plt.ylim(top=1.5 * max(subset["actual"].max(), subset["prediction"].max()))
+            # Set top of y-axis to 1.5 times the maximum value
+            plt.ylim(top=1.5 * max(subset["actual"].max(), subset["prediction"].max()))
 
-        # Display the plot or save it as an image
-        plt.grid(True)
-        plt.xticks(rotation=45, size=16, fontname="Arial")
-        # set ticks to size 16 and Arial font
-        plt.yticks(size=16, fontname="Arial")
-        plt.tight_layout()
-        plt.savefig(f"analysis/Test data predictions/week_{week}_{location}.png")
-        plt.show()
+            # Display the plot or save it as an image
+            plt.grid(True)
+            plt.xticks(rotation=45, size=16, fontname="Arial")
+            # set ticks to size 16 and Arial font
+            plt.yticks(size=16, fontname="Arial")
+            plt.tight_layout()
+            plt.savefig(
+                f"analysis/Test data predictions/week_{week}_{location}{fname_suffix}.png"
+            )
+            plt.show()
 
 # %%
 # Create one line graph for entire period in each location
@@ -663,7 +752,9 @@ for location in locations:
     # Customize the plot
     plt.title(
         f"Actual vs. Predicted Consumption in {location[0].upper()+location[1:]} (Test Data)",
-        size=18, fontname="Arial", y=1.02
+        size=18,
+        fontname="Arial",
+        y=1.02,
     )
     plt.xlabel("Time", size=16, fontname="Arial")
     plt.ylabel("Consumption (avg. MW in hour)", size=16, fontname="Arial")
@@ -724,7 +815,12 @@ cmap = matplotlib.colors.LinearSegmentedColormap.from_list(
     ],
 )
 sns.heatmap(corr, annot=True, cmap=cmap, annot_kws={"size": 15, "fontname": "Arial"})
-plt.title("Temperature and Consumption Correlation per Season", fontname="Arial", fontsize=20, y=1.02)
+plt.title(
+    "Temperature and Consumption Correlation per Season",
+    fontname="Arial",
+    fontsize=20,
+    y=1.02,
+)
 plt.xlabel("Feature", fontname="Arial", fontsize=16)
 plt.ylabel("Feature", fontname="Arial", fontsize=16)
 # set ticks to size 16 and Arial font
