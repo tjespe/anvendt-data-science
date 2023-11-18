@@ -12,11 +12,13 @@ def read_consumption_data():
     """
     # Read the csv file
     df = pd.read_csv("data/consumption.csv")
+    # Capitalize column headers
+    df.columns = [col.capitalize() for col in df.columns]
     # Convert the date column to datetime
-    df["time"] = pd.to_datetime(df["time"])
+    df["Time"] = pd.to_datetime(df["Time"])
     # Ensure consumption and temperature are floats
-    df["consumption"] = df["consumption"].astype(float)
-    df["temperature"] = df["temperature"].astype(float)
+    df["Consumption"] = df["Consumption"].astype(float)
+    df["Temperature"] = df["Temperature"].astype(float)
     # Return the dataframe
     return df
 
@@ -39,8 +41,9 @@ def read_holiday_data():
 
 # %%
 def add_time_features(df):
-    df["hour"] = df["time"].dt.strftime("%H")
-    df["season"] = df["time"].dt.month.apply(
+    df["Hour"] = df["Time"].dt.strftime("%H")
+    df["Month"] = df["Time"].dt.strftime("%m")
+    df["Season"] = df["Time"].dt.month.apply(
         lambda x: "winter"
         if x in [12, 1, 2]
         else "spring"
@@ -49,23 +52,23 @@ def add_time_features(df):
         if x in [6, 7, 8]
         else "fall"
     )
-    df["weekday"] = df["time"].dt.day_name()
-    df["weekend"] = df["weekday"].isin(["Saturday", "Sunday"])
+    df["Weekday"] = df["Time"].dt.day_name()
+    df["Weekend"] = df["Weekday"].isin(["Saturday", "Sunday"])
     return df
 
 
 def get_cumulative_stats(df, rolling_normalization_window_days):
-    # df = df.copy().reset_index().sort_values(by="time")
+    # df = df.copy().reset_index().sort_values(by="Time")
     if rolling_normalization_window_days:
         cumulative_stats = (
-            df.groupby("location")["consumption"]
+            df.groupby("Location")["Consumption"]
             .shift(5 * 24)  # Shift by 5 days to account for lag on receiving data
             .rolling(rolling_normalization_window_days * 24)
             .agg(["mean", "std"])
         )
     else:
         cumulative_stats = (
-            df.groupby("location")["consumption"]
+            df.groupby("Location")["Consumption"]
             .shift(5 * 24)  # Shift by 5 days to account for lag on receiving data
             .expanding()
             .agg(["mean", "std"])
@@ -76,49 +79,49 @@ def get_cumulative_stats(df, rolling_normalization_window_days):
 
 def normalize_consumption(df, rolling_normalization_window_days):
     cumulative_stats = get_cumulative_stats(df, rolling_normalization_window_days)
-    df["consumption_normalized"] = (
-        df["consumption"] - cumulative_stats["mean"]
+    df["Normalized consumption"] = (
+        df["Consumption"] - cumulative_stats["mean"]
     ) / cumulative_stats["std"]
     return df, cumulative_stats
 
 
 def add_temperature_features(df):
-    df["temperature_1h_ago"] = df.groupby("location", observed=True)[
-        "temperature"
+    df["Temperature 1 hour ago"] = df.groupby("Location", observed=True)[
+        "Temperature"
     ].transform(lambda x: x.shift(1))
-    df["temperature_2h_ago"] = df.groupby("location", observed=True)[
-        "temperature"
+    df["Temperature 2 hours ago"] = df.groupby("Location", observed=True)[
+        "Temperature"
     ].transform(lambda x: x.shift(2))
-    df["temperature_3h_ago"] = df.groupby("location", observed=True)[
-        "temperature"
+    df["Temperature 3 hours ago"] = df.groupby("Location", observed=True)[
+        "Temperature"
     ].transform(lambda x: x.shift(3))
-    df["temperature_4_to_6h_ago"] = df.groupby("location", observed=True)[
-        "temperature"
+    df["Average temperature 4 to 6 hours ago"] = df.groupby("Location", observed=True)[
+        "Temperature"
     ].transform(lambda x: x.shift(4).rolling(3).mean())
-    df["temperature_7_to_12h_ago"] = df.groupby("location", observed=True)[
-        "temperature"
+    df["Average temperature 7 to 12 hours ago"] = df.groupby("Location", observed=True)[
+        "Temperature"
     ].transform(lambda x: x.shift(7).rolling(6).mean())
-    df["temperature_13_to_24h_ago"] = df.groupby("location", observed=True)[
-        "temperature"
-    ].transform(lambda x: x.shift(13).rolling(12).mean())
-    df["temperature_prev_week"] = df.groupby("location", observed=True)[
-        "temperature"
+    df["Average temperature 13 to 24 hours ago"] = df.groupby(
+        "Location", observed=True
+    )["Temperature"].transform(lambda x: x.shift(13).rolling(12).mean())
+    df["Average temperature last week"] = df.groupby("Location", observed=True)[
+        "Temperature"
     ].transform(lambda x: x.shift(25).rolling(6 * 24).mean())
-    df["temperature_1w_ago"] = df.groupby(
-        ["location", "hour", "weekday"], observed=True
-    )["temperature"].transform(lambda x: x.shift(1))
-    df["temperature_prev_prev_week"] = df.groupby("location", observed=True)[
-        "temperature"
+    df["Temperature one week ago"] = df.groupby(
+        ["Location", "Hour", "Weekday"], observed=True
+    )["Temperature"].transform(lambda x: x.shift(1))
+    df["Average temperature two weeks ago"] = df.groupby("Location", observed=True)[
+        "Temperature"
     ].transform(lambda x: x.shift(6 * 24 + 25).rolling(7 * 24).mean())
-    df["temperature_2w_ago"] = df.groupby(
-        ["location", "hour", "weekday"], observed=True
-    )["temperature"].transform(lambda x: x.shift(2))
-    df["temperature_prev_prev_prev_week"] = df.groupby("location", observed=True)[
-        "temperature"
+    df["Temperature two weeks ago"] = df.groupby(
+        ["Location", "Hour", "Weekday"], observed=True
+    )["Temperature"].transform(lambda x: x.shift(2))
+    df["Average temperature three weeks ago"] = df.groupby("Location", observed=True)[
+        "Temperature"
     ].transform(lambda x: x.shift(13 * 24 + 25).rolling(7 * 24).mean())
-    df["temperature_3w_ago"] = df.groupby(
-        ["location", "hour", "weekday"], observed=True
-    )["temperature"].transform(lambda x: x.shift(3))
+    df["Temperature three weeks ago"] = df.groupby(
+        ["Location", "Hour", "Weekday"], observed=True
+    )["Temperature"].transform(lambda x: x.shift(3))
     return df
 
 
@@ -143,45 +146,46 @@ def preprocess_consumption_data(df: pd.DataFrame, rolling_normalization_window_d
     df : pd.DataFrame
         Preprocessed consumption data. Columns:
         ### Time-based:
-        - time: datetime, the hour of the measurement. **NB** Not intended to be used as a feature, but left in for
+        - Time: datetime, the hour of the measurement. **NB** Not intended to be used as a feature, but left in for
             convenience.
-        - hour: string, the hour of the measurement ("00" - "23", can be used as categorical)
-        - month: string, the month of the measurement ("01" - "12", can be used as categorical)
-        - season: string, the season of the measurement ("winter", "spring", "summer", "fall", can be used as categorical)
-        - weekend: bool, whether the measurement was on a weekend
-        - weekday: string, the weekday of the measurement ("Monday" - "Sunday", can be used as categorical)
-        - holiday: bool, whether the measurement was during a holiday NOT IMPLEMENTED
-        - days_to_holiday: int, number of days to the next holiday NOT IMPLEMENTED
+        - Hour: string, the hour of the measurement ("00" - "23", can be used as categorical)
+        - Month: string, the month of the measurement ("01" - "12", can be used as categorical)
+        - Season: string, the season of the measurement ("winter", "spring", "summer", "fall", can be used as categorical)
+        - Weekend: bool, whether the measurement was on a weekend
+        - Weekday: string, the weekday of the measurement ("Monday" - "Sunday", can be used as categorical)
+        - Holiday: bool, whether the measurement was during a holiday
+        - Days to holiday: int, number of days to the next holiday NOT IMPLEMENTED
         ### Location-based:
-        - location: string, one of the 6 cities
+        - Location: string, one of the 6 cities
         ### Consumption-based:
-        - consumption_normalized: float, the consumption normalized by the mean consumption of the location.
+        - Normalized consumption: float, the consumption normalized by the mean consumption of the location.
             **NB**: This is the target variable.
-        - mean_consumption_7d: float, the mean (normalized) consumption at that hour last 7 days
+        - Mean consumption last 7 days: float, the mean (normalized) consumption the last 7 days
             **NB**: Since there is a 5 day data lag, this feature is the mean of the 7 days preceding the
             5 days preceding the measurement, i.e. |---7d used for mean---|---5d gap---|---measurement---|
-            For training, we only use training data points when calculating the mean.
-            For validation, we only use training and validation data points when calculating the mean.
-            For test, we only use training, validation, and test data points when calculating the mean.
-        - mean_consumption_14d: float, the mean (normalized) consumption at that hour last 14 days (same system as 7d)
-        - consumption_1w_ago: float, the consumption (normalized) at the same hour 1 week ago.
-        - mean_consumption_at_hour_4d: float, the mean (normalized) consumption at that hour last 4 days
-        - mean_consumption_at_hour_7d: float, the mean (normalized) consumption at that hour last 7 days
-        - mean_consumption_at_hour_14d: float, the mean (normalized) consumption at that hour last 14 days
+        - Mean consumption last 14 days: float, the mean (normalized) consumption the last 14 days (same system as 7d)
+        - Consumption 1 week ago: float, the consumption at the same hour 1 week ago.
+        - Mean consumption at same hour last 4 days: float, the mean consumption at that hour last 4 days
+        - Mean consumption at same hour last 7 days: float, the mean consumption at that hour last 7 days
+        - Mean consumption at same hour last 14 days: float, the mean consumption at that hour last 14 days
+        - Normalized consumption 1 week ago: float, the consumption (normalized) at the same hour 1 week ago.
+        - Normalized mean consumption at same hour last 4 days: float
+        - Normalized mean consumption at same hour last 7 days: float
+        - Normalized mean consumption at same hour last 14 days: float
         ### Temperature-based:
         - temperature: float, avg. forecasted temperature in the hour
-        - temperature_1h_ago: float, avg. forecasted temperature in the hour 1 hour ago
-        - temperature_2h_ago: float, avg. forecasted temperature in the hour 2 hours ago
-        - temperature_3h_ago: float, avg. forecasted temperature in the hour 3 hours ago
-        - temperature_4_to_6h_ago: float, avg. forecasted temperature in the hours 4-6 hours ago
-        - temperature_7_to_12h_ago: float, avg. forecasted temperature in the hours 7-12 hours ago
-        - temperature_13_to_24h_ago: float, avg. forecasted temperature in the hours 13-24 hours ago
-        - temperature_prev_week: float, avg. forecasted temperature in the hour 1 week ago
-        - temperature_1w_ago: float, avg. forecasted temperature in the hour 1 week ago
-        - temperature_prev_prev_week: float, avg. forecasted temperature in the hour 2 weeks ago
-        - temperature_2w_ago: float, avg. forecasted temperature in the hour 2 weeks ago
-        - temperature_prev_prev_prev_week: float, avg. forecasted temperature in the hour 3 weeks ago
-        - temperature_3w_ago: float, avg. forecasted temperature in the hour 3 weeks ago
+        - Temperature 1 hour ago: float, avg. forecasted temperature in the hour 1 hour ago
+        - Temperature 2 hours ago: float, avg. forecasted temperature in the hour 2 hours ago
+        - Temperature 3 hours ago: float, avg. forecasted temperature in the hour 3 hours ago
+        - Average temperature 4 to 6 hours ago: float, avg. forecasted temperature in the hours 4-6 hours ago
+        - Average temperature 7 to 12 hours ago: float, avg. forecasted temperature in the hours 7-12 hours ago
+        - Average temperature 13 to 24 hours ago: float, avg. forecasted temperature in the hours 13-24 hours ago
+        - Average temperature last week: float, avg. forecasted temperature in the hour 1 week ago
+        - Temperature one week ago: float, avg. forecasted temperature in the hour 1 week ago
+        - Average temperature two weeks ago: float, avg. forecasted temperature in the hour 2 weeks ago
+        - Temperature two weeks ago: float, avg. forecasted temperature in the hour 2 weeks ago
+        - Average temperature three weeks ago: float, avg. forecasted temperature in the hour 3 weeks ago
+        - Temperature three weeks ago: float, avg. forecasted temperature in the hour 3 weeks ago
     """
     # %%
 
@@ -189,16 +193,16 @@ def preprocess_consumption_data(df: pd.DataFrame, rolling_normalization_window_d
     holiday_df = read_holiday_data()
     holiday_norway_df = holiday_df[holiday_df["country"] == "Norway"]
     holiday_finland_df = holiday_df[holiday_df["country"] == "Finland"]
-    df["holiday_norway"] = df["time"].dt.date.isin(holiday_norway_df["date"]) & df[
-        "location"
+    df["holiday_norway"] = df["Time"].dt.date.isin(holiday_norway_df["date"]) & df[
+        "Location"
     ].isin(["oslo", "bergen", "trondheim", "tromsø", "stavanger"])
-    df["holiday_finland"] = df["time"].dt.date.isin(holiday_finland_df["date"]) & df[
-        "location"
+    df["holiday_finland"] = df["Time"].dt.date.isin(holiday_finland_df["date"]) & df[
+        "Location"
     ].isin(["helsingfors"])
-    df["holiday"] = df["holiday_norway"] | df["holiday_finland"]
+    df["Holiday"] = df["holiday_norway"] | df["holiday_finland"]
     df = df.drop(["holiday_norway", "holiday_finland"], axis=1)
 
-    # df["days_to_holiday"] = ...
+    # df["Days to holiday"] = ...
 
     # %%
     # Extract the time features
@@ -206,7 +210,7 @@ def preprocess_consumption_data(df: pd.DataFrame, rolling_normalization_window_d
 
     # %%
     # Extract the location
-    df["location"] = df["location"].astype("category")
+    df["Location"] = df["Location"].astype("category")
 
     # %%
     # Normalize consumption using cumulative normalization per location
@@ -215,25 +219,26 @@ def preprocess_consumption_data(df: pd.DataFrame, rolling_normalization_window_d
     # %%
     # Generate consumption features
     for lookback in [4, 7, 14]:
-        df[f"mean_consumption_at_hour_{lookback}d"] = df.groupby(
-            ["hour", "location"], observed=True
-        )["consumption"].transform(lambda x: x.shift(5).rolling(lookback).mean())
-        df[f"mean_consumption_at_hour_{lookback}d_normalized"] = (
-            df[f"mean_consumption_at_hour_{lookback}d"] - cumulative_stats["mean"]
+        df[f"Mean consumption at same hour last {lookback} days"] = df.groupby(
+            ["Hour", "Location"], observed=True
+        )["Consumption"].transform(lambda x: x.shift(5).rolling(lookback).mean())
+        df[f"Normalized mean consumption at same hour last {lookback} days"] = (
+            df[f"Mean consumption at same hour last {lookback} days"]
+            - cumulative_stats["mean"]
         ) / cumulative_stats["std"]
-        df[f"mean_consumption_{lookback}d"] = df.groupby("location", observed=True)[
-            "consumption"
-        ].transform(lambda x: x.shift(5 * 24).rolling(lookback).mean())
-        df[f"mean_consumption_{lookback}d_normalized"] = (
-            df[f"mean_consumption_{lookback}d"] - cumulative_stats["mean"]
+        df[f"Mean consumption last {lookback} days"] = df.groupby(
+            "Location", observed=True
+        )["Consumption"].transform(lambda x: x.shift(5 * 24).rolling(lookback).mean())
+        df[f"Normalized mean consumption last {lookback} days"] = (
+            df[f"Mean consumption last {lookback} days"] - cumulative_stats["mean"]
         ) / cumulative_stats["std"]
 
-    df["consumption_1w_ago"] = df.groupby(
-        ["location", "weekday", "hour"], observed=True
-    )["consumption"].transform(lambda x: x.shift(1))
-    df["consumption_1w_ago_normalized"] = (
-        df.groupby(["location", "weekday", "hour"], observed=True)[
-            "consumption"
+    df["Consumption 1 week ago"] = df.groupby(
+        ["Location", "Weekday", "Hour"], observed=True
+    )["Consumption"].transform(lambda x: x.shift(1))
+    df["Normalized consumption 1 week ago"] = (
+        df.groupby(["Location", "Weekday", "Hour"], observed=True)[
+            "Consumption"
         ].transform(lambda x: x.shift(1))
         - cumulative_stats["mean"]
     ) / cumulative_stats["std"]

@@ -29,15 +29,15 @@ reg_lambda = 0.3
 
 # %%
 features_to_use = [
-    "consumption_1w_ago_normalized",
-    "temperature",
-    "temperature_4_to_6h_ago",
-    "temperature_7_to_12h_ago",
-    "temperature_1w_ago",
-    "temperature_prev_week",
-    "temperature_prev_prev_week",
-    "mean_consumption_at_hour_4d_normalized",
-    "mean_consumption_at_hour_7d_normalized",
+    "Normalized consumption 1 week ago",
+    "Temperature",
+    "Average temperature 4 to 6 hours ago",
+    "Average temperature 7 to 12 hours ago",
+    "Temperature one week ago",
+    "Average temperature last week",
+    "Average temperature two weeks ago",
+    "Normalized mean consumption at same hour last 4 days",
+    "Normalized mean consumption at same hour last 7 days",
 ]
 
 # %%
@@ -55,7 +55,7 @@ raw_df = read_consumption_data()
 
 # %%
 # Remove Helsingfors
-raw_df = raw_df[raw_df["location"] != "helsingfors"]
+raw_df = raw_df[raw_df["Location"] != "helsingfors"]
 
 # %%
 print("Preprocessing data...")
@@ -65,7 +65,7 @@ print("Splitting")
 folds = split_into_cv_folds_and_test_fold(
     processed_df,
     n_splits=num_splits,
-    target_variable="consumption_normalized" if use_normalization else "consumption",
+    target_variable="Normalized consumption" if use_normalization else "Consumption",
 )
 # %%
 # Skip first fold because it has too little training data
@@ -121,14 +121,14 @@ results_df = pd.concat(results_dfs)
 # %%
 # Add baseline prediction (equal to the actual value for the same hour and same location the previous week)
 baseline_df = processed_df[
-    ["consumption", "location", "hour", "time", "weekday"]
+    ["Consumption", "Location", "Hour", "Time", "Weekday"]
 ].copy()
 baseline_df["baseline"] = (
-    baseline_df.sort_values(by="time")
-    .groupby(["location", "hour", "weekday"])["consumption"]
+    baseline_df.sort_values(by="Time")
+    .groupby(["Location", "Hour", "Weekday"])["Consumption"]
     .shift(1)
 )
-baseline_df = baseline_df.set_index(["time", "location"])
+baseline_df = baseline_df.set_index(["Time", "Location"])
 results_df = results_df.join(baseline_df["baseline"])
 
 # %%
@@ -156,11 +156,11 @@ print(f"MAPE: {mape}%")
 print(f"MAPE (baseline): {results_df['APE_baseline'].mean()}%")
 print(
     "Location stats\n",
-    results_df.groupby(results_df.index.get_level_values("location"), observed=True)[
+    results_df.groupby(results_df.index.get_level_values("Location"), observed=True)[
         ["APE", "PE", "APE_baseline", "PE_baseline"]
     ].mean(),
 )
-fold_stats = results_df.reset_index().groupby("fold")["time"].agg(["min", "max"])
+fold_stats = results_df.reset_index().groupby("fold")["Time"].agg(["min", "max"])
 fold_stats.columns = ["From", "To"]
 fold_stats["MAPE"] = results_df.groupby("fold")["APE"].mean()
 fold_stats["MPE"] = results_df.groupby("fold")["PE"].mean()
@@ -172,12 +172,12 @@ print(fold_stats)
 
 # %%
 results_df = results_df.reset_index()
-results_df["date"] = results_df["time"].dt.date
-results_df["week"] = results_df["time"].dt.strftime("%W")
+results_df["date"] = results_df["Time"].dt.date
+results_df["week"] = results_df["Time"].dt.strftime("%W")
 dates = results_df["date"].unique()
 weeks = results_df["week"].unique()
-locations = results_df["location"].unique()
-results_df = results_df.set_index(["time", "location"])
+locations = results_df["Location"].unique()
+results_df = results_df.set_index(["Time", "Location"])
 
 # %%
 # Loop through each week and create a separate line graph
@@ -186,7 +186,7 @@ for week in weeks:
         # Filter data for the current week
         subset = results_df[
             (results_df["week"] == week)
-            & (results_df.index.get_level_values("location") == location)
+            & (results_df.index.get_level_values("Location") == location)
         ]
 
         # Skip if subset is empty
@@ -198,12 +198,12 @@ for week in weeks:
         # Apply color palette
         plt.gca().set_prop_cycle(color=colors)
         plt.plot(
-            subset.index.get_level_values("time"),
+            subset.index.get_level_values("Time"),
             subset["actual"],
             label="Actual",
         )
         plt.plot(
-            subset.index.get_level_values("time"),
+            subset.index.get_level_values("Time"),
             subset["prediction"],
             label="Predicted",
         )
@@ -249,10 +249,10 @@ X_train = pd.get_dummies(X_train)
 
 # Exclude the last 5 days of training data, to account for the 5 day data lag in real
 # world predictions
-first_date_test = X_test.index.get_level_values("time").min()
+first_date_test = X_test.index.get_level_values("Time").min()
 last_allowed_date_train = first_date_test - pd.Timedelta(days=5)
-X_train = X_train[X_train.index.get_level_values("time") <= last_allowed_date_train]
-y_train = y_train[y_train.index.get_level_values("time") <= last_allowed_date_train]
+X_train = X_train[X_train.index.get_level_values("Time") <= last_allowed_date_train]
+y_train = y_train[y_train.index.get_level_values("Time") <= last_allowed_date_train]
 
 model = train_xgb(
     X_train,
@@ -290,7 +290,7 @@ else:
 raw_folds = split_into_cv_folds_and_test_fold(
     raw_df,
     n_splits=num_splits,
-    target_variable="consumption",
+    target_variable="Consumption",
 )
 raw_test_fold = raw_folds[-1]
 raw_X_train, raw_y_train = raw_test_fold[0]
@@ -356,7 +356,7 @@ print(f"MAPE (baseline): {results_df['APE_baseline'].mean()}%")
 print(f"MAPE (raw): {results_df['APE_raw'].mean()}%")
 print(
     "Location stats\n",
-    results_df.groupby(results_df.index.get_level_values("location"), observed=True)[
+    results_df.groupby(results_df.index.get_level_values("Location"), observed=True)[
         ["APE", "PE", "APE_baseline", "PE_baseline", "APE_raw", "PE_raw"]
     ].mean(),
 )
@@ -481,12 +481,12 @@ print(
 
 # %%
 results_df = results_df.reset_index()
-results_df["date"] = results_df["time"].dt.date
-results_df["week"] = results_df["time"].dt.strftime("%W")
+results_df["date"] = results_df["Time"].dt.date
+results_df["week"] = results_df["Time"].dt.strftime("%W")
 dates = results_df["date"].unique()
 weeks = results_df["week"].unique()
-locations = results_df["location"].unique()
-results_df = results_df.set_index(["time", "location"])
+locations = results_df["Location"].unique()
+results_df = results_df.set_index(["Time", "Location"])
 
 # %%
 results_df.head()
@@ -495,18 +495,18 @@ results_df.head()
 
 # calculate the MAPE for predection and baseline for each location individually
 mape_pred = results_df.groupby(
-    results_df.index.get_level_values("location"), observed=True
+    results_df.index.get_level_values("Location"), observed=True
 )["APE"].mean()
 mape_baseline = results_df.groupby(
-    results_df.index.get_level_values("location"), observed=True
+    results_df.index.get_level_values("Location"), observed=True
 )["APE_baseline"].mean()
 
 # calculate the MPE for predection and baseline for each location individually
 mpe_pred = results_df.groupby(
-    results_df.index.get_level_values("location"), observed=True
+    results_df.index.get_level_values("Location"), observed=True
 )["PE"].mean()
 mpe_baseline = results_df.groupby(
-    results_df.index.get_level_values("location"), observed=True
+    results_df.index.get_level_values("Location"), observed=True
 )["PE_baseline"].mean()
 
 # sort the locations by: Oslo, Trondheim, Bergen, Stavanger, Tromsø
@@ -657,7 +657,7 @@ for week in weeks:
         # Filter data for the current week
         subset = results_df[
             (results_df["week"] == week)
-            & (results_df.index.get_level_values("location") == location)
+            & (results_df.index.get_level_values("Location") == location)
         ]
 
         # Skip if subset is empty
@@ -675,13 +675,13 @@ for week in weeks:
             # Apply color palette
             plt.gca().set_prop_cycle(color=colors)
             sns.lineplot(
-                x=subset.index.get_level_values("time"),
+                x=subset.index.get_level_values("Time"),
                 y=subset["actual"],
                 label="Actual",
                 linewidth=2,
             )
             sns.lineplot(
-                x=subset.index.get_level_values("time"),
+                x=subset.index.get_level_values("Time"),
                 y=subset[key],
                 label=label,
                 linewidth=2,
@@ -728,7 +728,7 @@ for week in weeks:
 # Create one line graph for entire period in each location
 for location in locations:
     # Filter data for the current week
-    subset = results_df[results_df.index.get_level_values("location") == location]
+    subset = results_df[results_df.index.get_level_values("Location") == location]
 
     # Skip if subset is empty
     if subset.empty:
@@ -739,13 +739,13 @@ for location in locations:
     # Apply color palette
     plt.gca().set_prop_cycle(color=colors)
     sns.lineplot(
-        x=subset.index.get_level_values("time"),
+        x=subset.index.get_level_values("Time"),
         y=subset["actual"],
         label="Actual",
         linewidth=2,
     )
     sns.lineplot(
-        x=subset.index.get_level_values("time"),
+        x=subset.index.get_level_values("Time"),
         y=subset["prediction"],
         label="Predicted",
         linewidth=2,
@@ -805,7 +805,7 @@ plt.savefig("analysis/importance.png")
 # Plot correlation between features
 all_data = pd.concat([X_train, X_test])
 all_target = pd.concat([y_train, y_test])
-all_data["consumption"] = all_target
+all_data["Consumption"] = all_target
 corr = all_data.corr()
 plt.figure(figsize=(13, 12))
 # Create gradient cmap based on colors

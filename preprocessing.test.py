@@ -14,31 +14,31 @@ class TestPreprocessingFunctions(unittest.TestCase):
 
     def test_add_time_features(self):
         df = add_time_features(self.df.copy())
-        assert "hour" in df.columns
-        assert "season" in df.columns
-        assert "weekday" in df.columns
-        assert "weekend" in df.columns
+        assert "Hour" in df.columns
+        assert "Season" in df.columns
+        assert "Weekday" in df.columns
+        assert "Weekend" in df.columns
 
     def test_normalize_consumption(self):
         df, _ = normalize_consumption(self.df.copy(), None)
-        assert "consumption_normalized" in df.columns
-        assert df["consumption_normalized"].isna().sum() < df.shape[0] / 10
+        assert "Normalized consumption" in df.columns
+        assert df["Normalized consumption"].isna().sum() < df.shape[0] / 10
 
     def test_add_temperature_features(self):
         df = add_temperature_features(add_time_features(self.df.copy()))
         for feature in [
-            "temperature_1h_ago",
-            "temperature_2h_ago",
-            "temperature_3h_ago",
-            "temperature_4_to_6h_ago",
-            "temperature_7_to_12h_ago",
-            "temperature_13_to_24h_ago",
-            "temperature_prev_week",
-            "temperature_1w_ago",
-            "temperature_prev_prev_week",
-            "temperature_2w_ago",
-            "temperature_prev_prev_prev_week",
-            "temperature_3w_ago",
+            "Temperature 1 hour ago",
+            "Temperature 2 hours ago",
+            "Temperature 3 hours ago",
+            "Average temperature 4 to 6 hours ago",
+            "Average temperature 7 to 12 hours ago",
+            "Average temperature 13 to 24 hours ago",
+            "Average temperature last week",
+            "Temperature one week ago",
+            "Average temperature two weeks ago",
+            "Temperature two weeks ago",
+            "Average temperature three weeks ago",
+            "Temperature three weeks ago",
         ]:
             assert feature in df.columns
             assert df[feature].isna().sum() < df.shape[0] / 10

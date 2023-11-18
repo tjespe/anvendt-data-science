@@ -15,14 +15,14 @@ def denormalize_predictions(
     ----------
     predictions : pd.DataFrame, a dataframe with the predictions and the actual values.
         Index:
-        - time: datetime, the hour of the measurement
+        - Time: datetime, the hour of the measurement
         - location: string, one of the 6 cities
         Columns:
         - prediction: float, the predicted consumption normalized by the mean consumption of the location.
         - actual: float, the actual consumption normalized by the mean consumption of the location.
     raw_df: pd.DataFrame, a dataframe with raw data (from read_consumption_data function)
         Columns:
-        - time: datetime, the hour of the measurement
+        - Time: datetime, the hour of the measurement
         - location: string, one of the 6 cities
         - consumption: float
     rolling_normalization_window_size: int or None
@@ -31,11 +31,11 @@ def denormalize_predictions(
         up until each data point).
     """
     df = predictions.copy()
-    stats_df = raw_df[["time", "location", "consumption"]].copy().sort_values(by="time")
+    stats_df = raw_df[["Time", "Location", "Consumption"]].copy().sort_values(by="Time")
     stats_df[["mean", "std"]] = get_cumulative_stats(
         stats_df, rolling_normalization_window_size
     )
-    stats_df = stats_df.set_index(["time", "location"])
+    stats_df = stats_df.set_index(["Time", "Location"])
     df["prediction"] = df["prediction"] * stats_df["std"] + stats_df["mean"]
     df["actual"] = df["actual"] * stats_df["std"] + stats_df["mean"]
     return df

@@ -4,7 +4,7 @@ from sklearn.model_selection import TimeSeriesSplit
 
 
 def split_into_cv_folds_and_test_fold(
-    df: pd.DataFrame, n_splits=5, target_variable="consumption_normalized"
+    df: pd.DataFrame, n_splits=5, target_variable="Normalized consumption"
 ):
     """
     Splits data into folds.
@@ -38,14 +38,14 @@ def split_into_cv_folds_and_test_fold(
     ```
     """
     # Use time and location as index
-    df = df.set_index(["time", "location"])
+    df = df.set_index(["Time", "Location"])
     # Use location as a categorical column as well
-    df["location"] = df.index.get_level_values("location")
+    df["Location"] = df.index.get_level_values("Location")
     # Split into folds
     tscv = TimeSeriesSplit(n_splits=n_splits)
     splits = tscv.split(df)
     folds = []
-    target_variables = ["consumption_normalized", "consumption"]
+    target_variables = ["Normalized consumption", "Consumption"]
     if target_variable not in target_variables:
         raise Exception(
             f"Unexpected target variable {target_variable}, please choose one of {target_variables}"

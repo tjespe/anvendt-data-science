@@ -25,15 +25,15 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 # **NB**: When this list is changed, any feature selection studies
 # should be deleted so that Optuna forgets what it has learned.
 manually_chosen_features = {
-    "consumption_1w_ago_normalized",
-    "temperature",
-    "temperature_4_to_6h_ago",
-    "temperature_7_to_12h_ago",
-    "temperature_1w_ago",
-    "temperature_prev_week",
-    "temperature_prev_prev_week",
-    "mean_consumption_at_hour_4d_normalized",
-    "mean_consumption_at_hour_7d_normalized",
+    "Normalized consumption 1 week ago",
+    "Temperature",
+    "Average temperature 4 to 6 hours ago",
+    "Average temperature 7 to 12 hours ago",
+    "Temperature one week ago",
+    "Average temperature last week",
+    "Average temperature two weeks ago",
+    "Mean consumption at same hour last4d_normalized",
+    "Mean consumption at same hour last7d_normalized",
 }
 
 
@@ -63,7 +63,7 @@ if __name__ == "__main__":
     raw_df = read_consumption_data()
     # %%
     # Drop helsingfors
-    raw_df = raw_df[raw_df["location"] != "helsingfors"]
+    raw_df = raw_df[raw_df["Location"] != "helsingfors"]
 
     # %%
     do_feature_selection = False
@@ -113,9 +113,9 @@ if __name__ == "__main__":
         # rolling_normalization_window_days parameter lead to different nan values,
         # so the start date becomes different and the tests become uncomparable
         fixed_start_date = datetime.date(2022, 4, 29)
-        processed_df = processed_df[processed_df["time"].dt.date >= fixed_start_date]
-        print(processed_df["time"].min())
-        assert (min_date := processed_df["time"].dt.date.min()) == fixed_start_date, (
+        processed_df = processed_df[processed_df["Time"].dt.date >= fixed_start_date]
+        print(processed_df["Time"].min())
+        assert (min_date := processed_df["Time"].dt.date.min()) == fixed_start_date, (
             f"Expected first date in processed data to be {fixed_start_date}, but"
             f" was {min_date}"
         )
@@ -124,9 +124,9 @@ if __name__ == "__main__":
         folds = split_into_cv_folds_and_test_fold(
             processed_df,
             n_splits=num_splits,
-            target_variable="consumption_normalized"
+            target_variable="Normalized consumption"
             if use_normalization
-            else "consumption",
+            else "Consumption",
         )
         # %%
         # Skip first fold because it has too little training data
@@ -213,11 +213,11 @@ if __name__ == "__main__":
         print(
             "Location stats\n",
             results_df.groupby(
-                results_df.index.get_level_values("location"), observed=True
+                results_df.index.get_level_values("Location"), observed=True
             )[["APE", "PE"]].mean(),
         )
         fold_stats = (
-            results_df.reset_index().groupby("fold")["time"].agg(["min", "max"])
+            results_df.reset_index().groupby("fold")["Time"].agg(["min", "max"])
         )
         fold_stats.columns = ["From", "To"]
         fold_stats["MAPE"] = results_df.groupby("fold")["APE"].mean()
@@ -228,11 +228,11 @@ if __name__ == "__main__":
 
         # %%
         # Look at performance in Oslo
-        # for date in results_df.reset_index()["time"].dt.date.unique():
+        # for date in results_df.reset_index()["Time"].dt.date.unique():
         #     values_on_date = results_df.reset_index().loc[
-        #         pd.Series(results_df.index.get_level_values("time")).dt.date == date
+        #         pd.Series(results_df.index.get_level_values("Time")).dt.date == date
         #     ]
-        #     values_on_date[values_on_date["location"] == "oslo"].set_index("time")[
+        #     values_on_date[values_on_date["Location"] == "oslo"].set_index("Time")[
         #         ["actual", "prediction"]
         #     ].plot()
 
