@@ -666,6 +666,9 @@ for week in weeks:
         if subset.empty:
             continue
 
+        y_max = 1.5 * max(
+            subset["actual"].max(), subset["prediction"].max(), subset["baseline"].max()
+        )
         for label, key, fname_suffix, color in [
             ("Predicted", "prediction", "", colors[1]),
             ("Baseline", "baseline", "_baseline", colors[2]),
@@ -711,13 +714,8 @@ for week in weeks:
                 # Use whitegrid style
                 sns.set_style("whitegrid")
 
-                # Start y-axis at 0
-                plt.ylim(bottom=0)
-
-                # Set top of y-axis to 1.5 times the maximum value
-                plt.ylim(
-                    top=1.5 * max(subset["actual"].max(), subset["prediction"].max())
-                )
+                # Start y-axis at 0 and the top of y-axis to 1.5 times the maximum value
+                plt.ylim(bottom=0, top=y_max)
 
                 # Display the plot or save it as an image
                 plt.grid(True)
@@ -788,20 +786,33 @@ for location in locations:
 
 # %%
 # Plot feature importance of size 10x10
-fig, ax = plt.subplots(figsize=(12, 7))
-xgboost.plot_importance(model, ax=ax, color=colors[0])
-for text in ax.texts:
-    text.set_fontsize(14)  # Adjust the font size as needed
-# Use whitegrid style
-sns.set_style("whitegrid")
-# set title to size 18 and Arial font
-plt.title("Feature Importance", size=18, fontname="Arial", y=1.02)
-# set x and y labels to size 14 and Arial font
-plt.xlabel("F score", size=16, fontname="Arial")
-plt.ylabel("Feature", size=16, fontname="Arial")
-# set ticks to size 16 and Arial font
-plt.xticks(size=16, fontname="Arial")
-plt.yticks(size=16, fontname="Arial")
+for figsize, typ in [
+    ((12, 7), ""),
+    ((8 * 1.3, 6 * 1.3), "_presentation"),
+]:
+    fig, ax = plt.subplots(figsize=figsize)
+    xgboost.plot_importance(model, ax=ax, color=colors[0])
+    for text in ax.texts:
+        text.set_fontsize(14)  # Adjust the font size as needed
+    # Use whitegrid style
+    sns.set_style("whitegrid")
+    # set title to size 18 and Arial font
+    plt.title(
+        "Feature Importance",
+        size=18,
+        fontname="Arial",
+        y=1.02,
+    )
+    # set x and y labels to size 14 and Arial font
+    plt.xlabel("F score", size=16, fontname="Arial")
+    plt.ylabel("Feature", size=16, fontname="Arial")
+    # set ticks to size 16 and Arial font
+    plt.xticks(size=16, fontname="Arial")
+    plt.yticks(size=16, fontname="Arial")
+
+    # Save figure
+    plt.tight_layout()
+    plt.savefig(f"analysis/feature_importance{typ}.png")
 
 # Save figure
 plt.tight_layout()
@@ -824,7 +835,7 @@ cmap = matplotlib.colors.LinearSegmentedColormap.from_list(
 )
 sns.heatmap(corr, annot=True, cmap=cmap, annot_kws={"size": 15, "fontname": "Arial"})
 plt.title(
-    "Temperature and Consumption Correlation per Season",
+    "Feature correlation",
     fontname="Arial",
     fontsize=20,
     y=1.02,
