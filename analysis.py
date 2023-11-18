@@ -591,6 +591,7 @@ plt.yticks(size=16, fontname="Arial")
 # make the legend a square
 # Save figure
 plt.tight_layout()
+plt.savefig("analysis/results_mape_mpe_per_city.png")
 plt.show()
 
 # %% Making one for only mape for the presentation
@@ -642,6 +643,7 @@ plt.yticks(size=14, fontname="Arial")
 # make the legend a square
 # Save figure
 plt.tight_layout()
+plt.savefig("analysis/results_mape_per_city.png")
 plt.show()
 
 
@@ -669,60 +671,64 @@ for week in weeks:
             ("Baseline", "baseline", "_baseline", colors[2]),
         ]:
             # Create a new figure and plot the data
-            # (12, 6) for report
-            # (8, 6) for presentation
-            plt.figure(figsize=(12, 6))
-            # Apply color palette
-            plt.gca().set_prop_cycle(color=colors)
-            sns.lineplot(
-                x=subset.index.get_level_values("Time"),
-                y=subset["actual"],
-                label="Actual",
-                linewidth=2,
-            )
-            sns.lineplot(
-                x=subset.index.get_level_values("Time"),
-                y=subset[key],
-                label=label,
-                linewidth=2,
-                color=color,
-            )
+            for figsize, typ in [
+                ((12, 6), ""),
+                ((8, 6), "_presentation"),
+            ]:
+                plt.figure(figsize=figsize)
+                # Apply color palette
+                plt.gca().set_prop_cycle(color=colors)
+                sns.lineplot(
+                    x=subset.index.get_level_values("Time"),
+                    y=subset["actual"],
+                    label="Actual",
+                    linewidth=2,
+                )
+                sns.lineplot(
+                    x=subset.index.get_level_values("Time"),
+                    y=subset[key],
+                    label=label,
+                    linewidth=2,
+                    color=color,
+                )
 
-            # Set format for the x-axis
-            plt.gca().xaxis.set_major_formatter(
-                matplotlib.dates.DateFormatter("%a %H:%M")
-            )
+                # Set format for the x-axis
+                plt.gca().xaxis.set_major_formatter(
+                    matplotlib.dates.DateFormatter("%a %H:%M")
+                )
 
-            # Customize the plot
-            plt.title(
-                f"Week {week} - Actual vs. {label} Consumption in {location[0].upper()+location[1:]}",
-                size=18,
-                fontname="Arial",
-                y=1.02,
-            )
-            plt.xlabel("Hour of Day", size=16, fontname="Arial")
-            plt.ylabel("Consumption (avg. MW in hour)", size=16, fontname="Arial")
-            plt.legend(fontsize=12, loc="upper left")
+                # Customize the plot
+                plt.title(
+                    f"Week {week} - Actual vs. {label} Consumption in {location[0].upper()+location[1:]}",
+                    size=18,
+                    fontname="Arial",
+                    y=1.02,
+                )
+                plt.xlabel("Hour of Day", size=16, fontname="Arial")
+                plt.ylabel("Consumption (avg. MW in hour)", size=16, fontname="Arial")
+                plt.legend(fontsize=12, loc="upper left")
 
-            # Use whitegrid style
-            sns.set_style("whitegrid")
+                # Use whitegrid style
+                sns.set_style("whitegrid")
 
-            # Start y-axis at 0
-            plt.ylim(bottom=0)
+                # Start y-axis at 0
+                plt.ylim(bottom=0)
 
-            # Set top of y-axis to 1.5 times the maximum value
-            plt.ylim(top=1.5 * max(subset["actual"].max(), subset["prediction"].max()))
+                # Set top of y-axis to 1.5 times the maximum value
+                plt.ylim(
+                    top=1.5 * max(subset["actual"].max(), subset["prediction"].max())
+                )
 
-            # Display the plot or save it as an image
-            plt.grid(True)
-            plt.xticks(rotation=45, size=16, fontname="Arial")
-            # set ticks to size 16 and Arial font
-            plt.yticks(size=16, fontname="Arial")
-            plt.tight_layout()
-            plt.savefig(
-                f"analysis/Test data predictions/week_{week}_{location}{fname_suffix}.png"
-            )
-            plt.show()
+                # Display the plot or save it as an image
+                plt.grid(True)
+                plt.xticks(rotation=45, size=16, fontname="Arial")
+                # set ticks to size 16 and Arial font
+                plt.yticks(size=16, fontname="Arial")
+                plt.tight_layout()
+                plt.savefig(
+                    f"analysis/Test data predictions/week_{week}_{location}{fname_suffix}{typ}.png"
+                )
+                plt.show()
 
 # %%
 # Create one line graph for entire period in each location
@@ -828,6 +834,11 @@ plt.ylabel("Feature", fontname="Arial", fontsize=16)
 # set ticks to size 16 and Arial font
 plt.xticks(size=14, fontname="Arial")
 plt.yticks(size=14, fontname="Arial")
+# Wrap words in x-axis labels
+plt.xticks(
+    rotation=45,
+    ha="right",
+)
 plt.tight_layout()
 plt.savefig("analysis/correlation.png")
 plt.show()
