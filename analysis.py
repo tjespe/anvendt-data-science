@@ -153,7 +153,8 @@ results_df["APE_baseline"] = np.abs(results_df["PE_baseline"])
 # %%
 mape = results_df["APE"].mean()
 print(f"MAPE: {mape}%")
-print(f"MAPE (baseline): {results_df['APE_baseline'].mean()}%")
+mape_baseline = results_df["APE_baseline"].mean()
+print(f"MAPE (baseline): {mape_baseline}%")
 print(
     "Location stats\n",
     results_df.groupby(results_df.index.get_level_values("Location"), observed=True)[
@@ -352,8 +353,10 @@ results_df["APE_raw"] = np.abs(results_df["PE_raw"])
 # %%
 mape = results_df["APE"].mean()
 print(f"MAPE: {mape}%")
-print(f"MAPE (baseline): {results_df['APE_baseline'].mean()}%")
-print(f"MAPE (raw): {results_df['APE_raw'].mean()}%")
+mape_baseline = results_df["APE_baseline"].mean()
+print(f"MAPE (baseline): {mape_baseline}%")
+mape_raw = results_df["APE_raw"].mean()
+print(f"MAPE (raw): {mape_raw}%")
 print(
     "Location stats\n",
     results_df.groupby(results_df.index.get_level_values("Location"), observed=True)[
@@ -497,7 +500,7 @@ results_df.head()
 mape_pred = results_df.groupby(
     results_df.index.get_level_values("Location"), observed=True
 )["APE"].mean()
-mape_baseline = results_df.groupby(
+mape_baseline_per_location = results_df.groupby(
     results_df.index.get_level_values("Location"), observed=True
 )["APE_baseline"].mean()
 
@@ -511,7 +514,7 @@ mpe_baseline = results_df.groupby(
 
 # sort the locations by: Oslo, Trondheim, Bergen, Stavanger, Tromsø
 mape_pred = mape_pred.reindex(["oslo", "trondheim", "bergen", "stavanger", "tromsø"])
-mape_baseline = mape_baseline.reindex(
+mape_baseline_per_location = mape_baseline_per_location.reindex(
     ["oslo", "trondheim", "bergen", "stavanger", "tromsø"]
 )
 mpe_pred = mpe_pred.reindex(["oslo", "trondheim", "bergen", "stavanger", "tromsø"])
@@ -521,7 +524,7 @@ mpe_baseline = mpe_baseline.reindex(
 
 # make capital letter for location
 mape_pred.index = mape_pred.index.str.capitalize()
-mape_baseline.index = mape_baseline.index.str.capitalize()
+mape_baseline_per_location.index = mape_baseline_per_location.index.str.capitalize()
 mpe_pred.index = mpe_pred.index.str.capitalize()
 mpe_baseline.index = mpe_baseline.index.str.capitalize()
 
@@ -532,13 +535,13 @@ locations = ["Oslo", "Trondheim", "Bergen", "Stavanger", "Tromsø"]
 # make a list called "mape_pred_list" which is the MAPE for prediction for each location
 mape_pred_list = mape_pred.tolist()
 print(mape_pred_list)
-# make a list called "mape_baseline_list" which is the MAPE for baseline for each location
-mape_baseline_list = mape_baseline.tolist()
+# make a list called "mape_baseline_per_location_list" which is the MAPE for baseline for each location
+mape_baseline_per_location_list = mape_baseline_per_location.tolist()
 
 df = pd.DataFrame(
     {
         "Location": locations * 2,
-        "Values": mape_pred_list + mape_baseline_list,
+        "Values": mape_pred_list + mape_baseline_per_location_list,
         "": ["MAPE (model)"] * len(locations) + ["MAPE (baseline)"] * len(locations),
     }
 )
@@ -599,13 +602,13 @@ locations = ["Oslo", "Trondheim", "Bergen", "Stavanger", "Tromsø"]
 # make a list called "mape_pred_list" which is the MAPE for prediction for each location
 mape_pred_list = mape_pred.tolist()
 print(mape_pred_list)
-# make a list called "mape_baseline_list" which is the MAPE for baseline for each location
-mape_baseline_list = mape_baseline.tolist()
+# make a list called "mape_baseline_per_location_list" which is the MAPE for baseline for each location
+mape_baseline_per_location_list = mape_baseline_per_location.tolist()
 
 df = pd.DataFrame(
     {
         "Location": locations * 2,
-        "Values": mape_pred_list + mape_baseline_list,
+        "Values": mape_pred_list + mape_baseline_per_location_list,
         "": ["MAPE (model)"] * len(locations) + ["MAPE (baseline)"] * len(locations),
     }
 )
@@ -852,6 +855,69 @@ plt.xticks(
 )
 plt.tight_layout()
 plt.savefig("analysis/correlation.png")
+plt.show()
+
+# %% Bar plot standard deviation
+# make a sns barplot for the standard deviations for pred and baseline
+sns.set_style("whitegrid")
+plt.figure(figsize=(8, 6))
+sns.barplot(
+    x=["Forecasting Model", "Baseline"],
+    y=[std_pred, std_baseline],
+    palette=colors,
+    width=0.6,
+)
+# set title to size 18 and Arial font
+plt.title(
+    "Standard Deviation of Error for Forecasting Model vs. Baseline",
+    size=18,
+    fontname="Arial",
+    y=1.02,
+)
+# set x and y labels to size 14 and Arial font
+plt.ylabel("Standard Deviation (σ)", size=16, fontname="Arial")
+# Get the values y values for the 2 bars and add text to the top of the bars
+y1 = std_pred
+y2 = std_baseline
+plt.text(x=0, y=y1 + 0.01, s=round(y1, 2), size=16, fontname="Arial", ha="center")
+plt.text(x=1, y=y2 + 0.01, s=round(y2, 2), size=16, fontname="Arial", ha="center")
+# set ticks to size 16 and Arial font
+# give the x label a little space
+plt.gca().xaxis.labelpad = 10
+plt.xticks(size=16, fontname="Arial")
+plt.yticks(size=16, fontname="Arial")
+# Save figure
+plt.tight_layout()
+plt.savefig("analysis/std.png")
+plt.show()
+
+# %% Bar plot MAPE
+# make a sns barplot for the standard deviations for pred and baseline
+sns.set_style("whitegrid")
+plt.figure(figsize=(8, 6))
+sns.barplot(
+    x=["Forecasting Model", "Baseline"],
+    y=[mape, mape_baseline],
+    palette=colors,
+    width=0.6,
+)
+# set title to size 18 and Arial font
+plt.title("MAPE for Forecasting Model vs. Baseline", size=18, fontname="Arial", y=1.02)
+# set x and y labels to size 14 and Arial font
+plt.ylabel("MAPE (%)", size=16, fontname="Arial")
+# Get the values y values for the 2 bars and add text to the top of the bars
+y1 = mape
+y2 = mape_baseline
+plt.text(x=0, y=y1 + 0.01, s=f"{round(y1, 2)}%", size=16, fontname="Arial", ha="center")
+plt.text(x=1, y=y2 + 0.01, s=f"{round(y2, 2)}%", size=16, fontname="Arial", ha="center")
+# set ticks to size 16 and Arial font
+# give the x label a little space
+plt.gca().xaxis.labelpad = 10
+plt.xticks(size=16, fontname="Arial")
+plt.yticks(size=16, fontname="Arial")
+# Save figure
+plt.tight_layout()
+plt.savefig("analysis/mape.png")
 plt.show()
 
 # %%
