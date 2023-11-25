@@ -16,7 +16,7 @@ if __name__ == "__main__":
     # - NSGAIISampler
     # - TPESampler
     # Change the sampler both here and in `xgb.py` to run different studies
-    sampler = optuna.samplers.TPESampler()
+    sampler = None
     study_name = (
         f"XGBoost consumption prediction feature selection {sampler.__class__.__name__}"
     )
@@ -117,6 +117,30 @@ if __name__ == "__main__":
         significant = signifcant_MAPE_p_value & signifcant_RMSE_p_value
         print(
             f"{level} features (both MAPE p value and RMSE p value < {thresh}):",
+            json.dumps(
+                list(significant),
+                indent=4,
+            ),
+        )
+
+    # %%
+    # List significant features (using OR)
+    for level, thresh in [("Significant", 0.05), ("Strongly significant", 0.01)]:
+        signifcant_MAPE_p_value = set(
+            feature_inclusion_stats[
+                (feature_inclusion_stats["p-value"] < thresh)
+                | (feature_inclusion_stats.index.get_level_values("Metric") == "MAPE")
+            ].index.get_level_values("Feature")
+        )
+        signifcant_RMSE_p_value = set(
+            feature_inclusion_stats[
+                (feature_inclusion_stats["p-value"] < thresh)
+                | (feature_inclusion_stats.index.get_level_values("Metric") == "RMSE")
+            ].index.get_level_values("Feature")
+        )
+        significant = signifcant_MAPE_p_value & signifcant_RMSE_p_value
+        print(
+            f"{level} features (either MAPE p value or RMSE p value < {thresh}):",
             json.dumps(
                 list(significant),
                 indent=4,

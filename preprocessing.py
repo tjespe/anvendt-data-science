@@ -57,18 +57,18 @@ def add_time_features(df):
     return df
 
 
-def get_cumulative_stats(df, rolling_normalization_window_days):
+def get_cumulative_stats(df, rolling_normalization_window_days, variable="Consumption"):
     # df = df.copy().reset_index().sort_values(by="Time")
     if rolling_normalization_window_days:
         cumulative_stats = (
-            df.groupby("Location")["Consumption"]
+            df.groupby("Location")[variable]
             .shift(5 * 24)  # Shift by 5 days to account for lag on receiving data
             .rolling(rolling_normalization_window_days * 24)
             .agg(["mean", "std"])
         )
     else:
         cumulative_stats = (
-            df.groupby("Location")["Consumption"]
+            df.groupby("Location")[variable]
             .shift(5 * 24)  # Shift by 5 days to account for lag on receiving data
             .expanding()
             .agg(["mean", "std"])
@@ -122,6 +122,13 @@ def add_temperature_features(df):
     df["Temperature three weeks ago"] = df.groupby(
         ["Location", "Hour", "Weekday"], observed=True
     )["Temperature"].transform(lambda x: x.shift(3))
+    # Add normalized versions of every temperature feature, using get_cumulative_stats
+    cumulative_stats = get_cumulative_stats(df, rolling_normalization_window_days=None)
+    for col in df.columns:
+        if "temperature" in col.lower():
+            df[f"Normalized {col}"] = (
+                df[col] - cumulative_stats["mean"]
+            ) / cumulative_stats["std"]
     return df
 
 

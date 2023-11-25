@@ -32,8 +32,8 @@ manually_chosen_features = {
     "Temperature one week ago",
     "Average temperature last week",
     "Average temperature two weeks ago",
-    "Mean consumption at same hour last4d_normalized",
-    "Mean consumption at same hour last7d_normalized",
+    "Normalized mean consumption at same hour last 4 days",
+    "Normalized mean consumption at same hour last 7 days",
 }
 
 
@@ -66,7 +66,7 @@ if __name__ == "__main__":
     raw_df = raw_df[raw_df["Location"] != "helsingfors"]
 
     # %%
-    do_feature_selection = False
+    do_feature_selection = True
 
     def objective(trial):
         """
@@ -80,6 +80,10 @@ if __name__ == "__main__":
             n_estimators = 500
             max_depth = 5
             learning_rate = 0.033
+            subsample = 0.15
+            colsample_bytree = 0.50
+            gamma = 0.07
+            reg_lambda = 0.3
         else:
             use_normalization = True  # trial.suggest_categorical("use_target_normalization", [True, False])
             use_rolling = False

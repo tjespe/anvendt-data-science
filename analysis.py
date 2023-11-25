@@ -7,6 +7,7 @@ from sklearn.metrics import mean_squared_error
 import xgboost
 from denormalize import denormalize_predictions
 import seaborn as sns
+import matplotlib.colors as mcolors
 
 from preprocessing import preprocess_consumption_data, read_consumption_data
 from train_test_split import split_into_cv_folds_and_test_fold
@@ -142,11 +143,11 @@ print(f"RMSE (baseline): {rmse_baseline}")
 
 # Calculate mean absolute percentage error for denormalized data
 results_df["PE"] = 100 * (
-    (results_df["actual"] - results_df["prediction"]) / results_df["actual"]
+    (results_df["prediction"] - results_df["actual"]) / results_df["actual"]
 )
 results_df["APE"] = np.abs(results_df["PE"])
 results_df["PE_baseline"] = 100 * (
-    (results_df["actual"] - results_df["baseline"]) / results_df["actual"]
+    (results_df["baseline"] - results_df["actual"]) / results_df["actual"]
 )
 results_df["APE_baseline"] = np.abs(results_df["PE_baseline"])
 
@@ -338,15 +339,15 @@ print(f"RMSE (raw): {rmse_raw}")
 
 # Calculate mean absolute percentage error for denormalized data
 results_df["PE"] = 100 * (
-    (results_df["actual"] - results_df["prediction"]) / results_df["actual"]
+    (results_df["prediction"] - results_df["actual"]) / results_df["actual"]
 )
 results_df["APE"] = np.abs(results_df["PE"])
 results_df["PE_baseline"] = 100 * (
-    (results_df["actual"] - results_df["baseline"]) / results_df["actual"]
+    (results_df["baseline"] - results_df["actual"]) / results_df["actual"]
 )
 results_df["APE_baseline"] = np.abs(results_df["PE_baseline"])
 results_df["PE_raw"] = 100 * (
-    (results_df["actual"] - results_df["raw_prediction"]) / results_df["actual"]
+    (results_df["raw_prediction"] - results_df["actual"]) / results_df["actual"]
 )
 results_df["APE_raw"] = np.abs(results_df["PE_raw"])
 
@@ -553,9 +554,24 @@ plt.gca().set_prop_cycle(color=colors)
 # Create bar plot and set color to the same as the line plot
 sns.barplot(x="Location", y="Values", hue="", data=df, palette=colors, linewidth=2)
 
+# Assuming you have two bars per group ('MAPE (model)' and 'MAPE (baseline)')
+n_groups = len(locations)
+n_bars_per_group = 2
+bar_width = (
+    0.4  # This is the default in seaborn, but it might be different in your plot
+)
+total_width = n_bars_per_group * bar_width
+
+# Calculate the offset
+offset = total_width / 2 - bar_width / 2
+
+# Adjusted x-coordinates for the scatter plot
+adjusted_x_pred = np.arange(n_groups) - offset  # For MPE (model)
+adjusted_x_baseline = np.arange(n_groups) + offset  # For MPE (baseline)
+
 # make sns scatter plot for the MPE for prediction and baseline
 sns.scatterplot(
-    x=mpe_pred.index,
+    x=adjusted_x_pred,
     y=mpe_pred,
     color=colors[0],
     s=250,
@@ -563,7 +579,7 @@ sns.scatterplot(
     label="MPE (model)",
 )
 sns.scatterplot(
-    x=mpe_baseline.index,
+    x=adjusted_x_baseline,
     y=mpe_baseline,
     color=colors[1],
     s=250,
@@ -647,6 +663,70 @@ plt.yticks(size=14, fontname="Arial")
 # Save figure
 plt.tight_layout()
 plt.savefig("analysis/results_mape_per_city.png")
+plt.show()
+
+# %%
+# Alt.
+# Your existing DataFrame preparation code goes here...
+
+# Create a DataFrame for MPE values
+mpe_df = pd.DataFrame(
+    {
+        "Location": locations * 2,
+        "Values": mpe_pred.tolist() + mpe_baseline.tolist(),
+        "Type": ["MPE (model)"] * len(locations) + ["MPE (baseline)"] * len(locations),
+    }
+)
+
+# Make the plot larger to accommodate both sets of bars
+plt.figure(figsize=(12, 7))
+
+# Plot MAPE bars
+sns.barplot(x="Location", y="Values", hue="", data=df, palette=colors, linewidth=2)
+
+
+# Plot MPE bars on top of the MAPE bars
+# Adjust the width of the MPE bars to be narrower than the MAPE bars
+# Darken the colors for MPE bars
+def darken_color(color, factor=0.5):
+    """
+    Darkens a given color by blending it with black.
+
+    Parameters:
+    - color: The color to darken. Can be a hex code or a named color.
+    - factor: A value between 0 and 1. The higher the value, the darker the color.
+
+    Returns:
+    - A darkened color.
+    """
+    # Convert the color to RGB
+    rgb = mcolors.to_rgb(color)
+    # Darken the RGB components
+    darkened_rgb = [component * (1 - factor) for component in rgb]
+    # Convert back to hex and return
+    return mcolors.to_hex(darkened_rgb)
+
+
+darker_colors = [
+    darken_color(color, 0.5) for color in colors
+]  # Function to darken the colors
+sns.barplot(
+    x="Location",
+    y="Values",
+    hue="Type",
+    data=mpe_df,
+    palette=darker_colors,
+    linewidth=2,
+    edgecolor="white",
+    width=0.5,
+    # Add gap between bars
+    zorder=3,
+)
+
+# Set legend, style, title, labels, and other formatting as per your requirement
+# ...
+
+# Show the plot
 plt.show()
 
 
@@ -734,7 +814,7 @@ for week in weeks:
 # %%
 # Create one line graph for entire period in each location
 for location in locations:
-    # Filter data for the current week
+    # Filter data for the current location
     subset = results_df[results_df.index.get_level_values("Location") == location]
 
     # Skip if subset is empty
@@ -788,6 +868,100 @@ for location in locations:
     plt.show()
 
 # %%
+# Create a 5 x 1 grid graph where each subfigure is a line graph for a location
+fig, axes = plt.subplots(5, 1, figsize=(14, 16))
+
+# Use one y axis label for all charts
+fig.text(
+    -0,
+    0.5,
+    "Consumption (avg. MW in hour)",
+    va="center",
+    rotation="vertical",
+    size=16,
+    fontname="Arial",
+)
+
+for i, location in enumerate(sorted(locations)):
+    # Filter data for the current location
+    subset = results_df[results_df.index.get_level_values("Location") == location]
+
+    # Skip if subset is empty
+    if subset.empty:
+        continue
+
+    # Create a new figure and plot the data
+    sns.lineplot(
+        x=subset.index.get_level_values("Time"),
+        y=subset["actual"],
+        label="Actual",
+        linewidth=2,
+        ax=axes[i],
+        color=colors[2],
+    )
+    sns.lineplot(
+        x=subset.index.get_level_values("Time"),
+        y=subset["prediction"],
+        label="Predicted",
+        linewidth=2,
+        ax=axes[i],
+        color=colors[0],
+    )
+
+    # Customize the plot
+    # Don't use a title, but display the name of the city inside the chart
+    axes[i].text(
+        0.01,
+        0.85,
+        location[0].upper() + location[1:],
+        horizontalalignment="left",
+        transform=axes[i].transAxes,
+        size=18,
+        fontname="Arial",
+        weight="bold",
+    )
+    # Hide x axis lables unless it's the bottom plot
+    if i != 4:
+        axes[i].set_xticklabels([])
+        axes[i].set_xlabel("")
+    else:
+        axes[i].set_xlabel("Time", size=16, fontname="Arial")
+
+    # Hide y-axis label for all charts
+    axes[i].set_ylabel(" ")
+
+    # Modify tick parameters with labelsize and pad
+    axes[i].tick_params(axis="y", labelsize=16, pad=10, rotation=30)
+
+    # Use #.# format for y-axis ticks
+    axes[i].yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter("%.1f"))
+
+    # Force all y tick labels to be visible
+    axes[i].set_yticks(axes[i].get_yticks())
+
+    if i == 0:
+        axes[i].legend(fontsize=12, loc="upper right")
+    else:
+        axes[i].legend().set_visible(False)
+
+    # Use whitegrid style
+    sns.set_style("whitegrid")
+
+    # Start y-axis at 0
+    # axes[i].set_ylim(bottom=0)
+
+    # # Set top of y-axis to 1.5 times the maximum value
+    # axes[i].set_ylim(top=1.5 * max(subset["actual"].max(), subset["prediction"].max()))
+
+    # Display the plot or save it as an image
+    axes[i].grid(True)
+    axes[i].set_xticklabels(
+        axes[i].get_xticklabels(), rotation=45, size=16, fontname="Arial"
+    )
+plt.tight_layout()
+plt.savefig("analysis/Test data predictions/all_locations.png")
+
+# %%
 # Plot feature importance of size 10x10
 for figsize, typ in [
     ((12, 7), ""),
@@ -838,7 +1012,7 @@ cmap = matplotlib.colors.LinearSegmentedColormap.from_list(
 )
 sns.heatmap(corr, annot=True, cmap=cmap, annot_kws={"size": 15, "fontname": "Arial"})
 plt.title(
-    "Feature correlation",
+    "Feature Correlation",
     fontname="Arial",
     fontsize=20,
     y=1.02,
